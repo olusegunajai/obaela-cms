@@ -36,6 +36,8 @@
       "type": "object",
       "properties": {
         "clientUid": { "type": "string" },
+        "healerId": { "type": "string" },
+        "healerName": { "type": "string" },
         "type": { "type": "string", "enum": ["Ifa Divination", "Spiritual Guidance", "Destiny Reading", "Spiritual Cleansing", "Traditional Healing"] },
         "status": { "type": "string", "enum": ["pending", "confirmed", "completed", "cancelled"] },
         "scheduledAt": { "type": "string", "format": "date-time" },
@@ -52,6 +54,10 @@
       "type": "object",
       "properties": {
         "clientUid": { "type": "string" },
+        "customerName": { "type": "string" },
+        "email": { "type": "string" },
+        "phone": { "type": "string" },
+        "address": { "type": "string" },
         "items": {
           "type": "array",
           "items": {
@@ -60,17 +66,18 @@
               "productId": { "type": "string" },
               "name": { "type": "string" },
               "price": { "type": "number" },
-              "quantity": { "type": "integer" }
+              "quantity": { "type": "integer" },
+              "imageUrl": { "type": "string" }
             }
           }
         },
         "totalAmount": { "type": "number" },
-        "status": { "type": "string", "enum": ["pending", "processing", "shipped", "delivered", "cancelled"] },
-        "paymentStatus": { "type": "string", "enum": ["unpaid", "paid"] },
-        "shippingAddress": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "status": { "type": "string", "enum": ["pending", "paid", "processing", "shipped", "delivered", "cancelled"] },
+        "paymentReference": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["clientUid", "items", "totalAmount", "status", "createdAt"]
+      "required": ["clientUid", "customerName", "email", "items", "totalAmount", "status", "paymentReference"]
     },
     "Course": {
       "title": "Course",
@@ -99,6 +106,19 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["courseId", "title", "order"]
+    },
+    "Healer": {
+      "title": "Healer",
+      "description": "Traditional healers and spiritual guides",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "specialty": { "type": "string" },
+        "bio": { "type": "string" },
+        "imageUrl": { "type": "string", "format": "uri" },
+        "available": { "type": "boolean" }
+      },
+      "required": ["name", "specialty", "available"]
     }
   },
   "firestore": {
@@ -107,6 +127,7 @@
     "consultations": { "schema": "Consultation", "description": "Collection of consultation bookings" },
     "orders": { "schema": "Order", "description": "Collection of product orders" },
     "courses": { "schema": "Course", "description": "Collection of training courses" },
-    "courses/{courseId}/lessons": { "schema": "Lesson", "description": "Sub-collection of lessons for a specific course" }
+    "courses/{courseId}/lessons": { "schema": "Lesson", "description": "Sub-collection of lessons for a specific course" },
+    "healers": { "schema": "Healer", "description": "Collection of traditional healers" }
   }
 }
