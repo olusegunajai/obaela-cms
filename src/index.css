@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+:root {
+  --bg: #fdfcf7;
+  --ink: #1a1a1a;
+  --gold: #d4af37;
+  --earth: #5d4037;
+  --forest: #2e7d32;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.spiritual-gradient {
+  background: linear-gradient(135deg, var(--earth) 0%, var(--forest) 100%);
+}
+
+.gold-text {
+  color: var(--gold);
+}
