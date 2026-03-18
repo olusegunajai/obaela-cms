@@ -64,10 +64,10 @@ export const Auth = () => {
   return (
     <button 
       onClick={handleLogin}
-      className="flex items-center gap-2 px-4 py-2 bg-forest text-white rounded-full text-sm font-medium hover:bg-opacity-90 transition-all"
+      className="flex items-center gap-2 px-6 py-2.5 bg-forest text-white rounded-xl text-sm font-bold hover:bg-opacity-90 transition-all shadow-lg shadow-forest/20"
     >
-      <LogIn size={16} />
-      <span>Login</span>
+      <LogIn size={18} />
+      <span>Sign In</span>
     </button>
   );
 };

@@ -39,43 +39,231 @@ const Home = () => {
   }, []);
 
   return (
-    <div className="p-8">
-      <motion.div 
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="max-w-4xl mx-auto text-center"
-      >
-        <h1 className="text-5xl font-bold mb-6 gold-text">OBA ELA TRADO</h1>
-        <p className="text-xl mb-8 opacity-80">Traditional African Healing & Spiritual Guidance</p>
+    <div className="flex flex-col min-h-screen">
+      {/* Hero Section */}
+      <section className="relative h-[90vh] flex items-center justify-center overflow-hidden bg-[#0a0502]">
+        {/* Atmospheric background—layered gradients */}
+        <div className="absolute inset-0 atmosphere">
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#0a0502]/80" />
+        </div>
         
-        {!user && (
-          <div className="mb-12 p-8 bg-white rounded-3xl border border-black/5 shadow-sm inline-block">
-            <h3 className="text-xl font-bold mb-4">Join Our Community</h3>
-            <p className="opacity-60 mb-6">Create an account to access our academy, book consultations, and track your orders.</p>
-            <div className="flex justify-center">
-              <Auth />
+        <motion.div 
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1.2, ease: "easeOut" }}
+          className="relative z-10 text-center px-4 max-w-5xl"
+        >
+          <span className="text-gold uppercase tracking-[0.3em] text-sm font-semibold mb-6 block serif italic">Ancient Wisdom for Modern Times</span>
+          <h1 className="text-6xl md:text-8xl font-light text-white serif mb-8 leading-tight">
+            OBA ELA <br />
+            <span className="text-gold italic">TRADO MEDICAL</span>
+          </h1>
+          <p className="text-white/60 text-lg md:text-xl max-w-2xl mx-auto mb-12 font-light leading-relaxed">
+            Connecting you to the sacred traditions of Ifa and Orisha. Traditional African healing, spiritual guidance, and the path to destiny.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
+            <Link to="/consultation" className="px-10 py-4 bg-gold text-black font-bold rounded-full hover:bg-white transition-all duration-500 transform hover:scale-105">
+              Book Consultation
+            </Link>
+            <Link to="/store" className="px-10 py-4 border border-white/30 text-white font-bold rounded-full hover:bg-white/10 transition-all duration-500">
+              Explore Store
+            </Link>
+          </div>
+        </motion.div>
+
+        {/* Scroll Indicator */}
+        <motion.div 
+          animate={{ y: [0, 10, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 text-white/30"
+        >
+          <div className="w-[1px] h-16 bg-gradient-to-b from-gold to-transparent mx-auto" />
+        </motion.div>
+      </section>
+
+      {/* Wisdom Quote Section */}
+      <section className="py-32 bg-paper relative overflow-hidden">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <motion.div
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
+            viewport={{ once: true }}
+            className="serif italic text-3xl md:text-4xl text-earth/80 leading-relaxed mb-8"
+          >
+            "Ifa is the light that guides the soul through the darkness of uncertainty. Through the sacred Odu, we find our way back to the source of our destiny."
+          </motion.div>
+          <div className="w-24 h-[1px] bg-gold mx-auto mb-4" />
+          <p className="text-gold font-bold tracking-widest uppercase text-xs">OBA ELA TRADO</p>
+        </div>
+      </section>
+
+      {/* Services Bento Grid */}
+      <section className="py-24 px-6 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-20">
+            <h2 className="text-4xl md:text-5xl serif mb-4">Our Sacred Offerings</h2>
+            <p className="text-earth/60 max-w-xl mx-auto">Explore our range of traditional services designed to restore balance and harmony to your life.</p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+            {/* Consultation Card */}
+            <motion.div 
+              whileHover={{ y: -10 }}
+              className="md:col-span-8 bg-paper rounded-[2rem] p-10 flex flex-col md:flex-row gap-10 items-center border border-black/5"
+            >
+              <div className="flex-1">
+                <div className="w-16 h-16 bg-forest/10 rounded-2xl flex items-center justify-center mb-6">
+                  <Calendar className="text-forest w-8 h-8" />
+                </div>
+                <h3 className="text-3xl serif mb-4">Spiritual Consultations</h3>
+                <p className="text-earth/70 mb-8 leading-relaxed">
+                  Direct guidance from the Orishas through Ifa divination. Our consultations provide clarity on health, relationships, career, and spiritual growth.
+                </p>
+                <Link to="/consultation" className="text-gold font-bold flex items-center gap-2 hover:gap-4 transition-all">
+                  Book a session <Send size={16} />
+                </Link>
+              </div>
+              <div className="w-full md:w-1/2 aspect-square rounded-3xl overflow-hidden shadow-2xl">
+                <img 
+                  src="https://picsum.photos/seed/ifa/600/600" 
+                  alt="Ifa Divination" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            </motion.div>
+
+            {/* Store Card */}
+            <motion.div 
+              whileHover={{ y: -10 }}
+              className="md:col-span-4 bg-forest text-white rounded-[2rem] p-10 flex flex-col justify-between border border-black/5"
+            >
+              <div>
+                <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mb-6">
+                  <ShoppingBag className="text-white w-8 h-8" />
+                </div>
+                <h3 className="text-3xl serif mb-4">Herbal Store</h3>
+                <p className="text-white/70 mb-8 leading-relaxed">
+                  Authentic traditional medicines, spiritual soaps, and consecrated items prepared with ancient knowledge.
+                </p>
+              </div>
+              <Link to="/store" className="text-gold font-bold flex items-center gap-2 hover:gap-4 transition-all">
+                Shop Items <ShoppingCart size={16} />
+              </Link>
+            </motion.div>
+
+            {/* Academy Card */}
+            <motion.div 
+              whileHover={{ y: -10 }}
+              className="md:col-span-4 bg-earth text-white rounded-[2rem] p-10 flex flex-col justify-between border border-black/5"
+            >
+              <div>
+                <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mb-6">
+                  <BookOpen className="text-white w-8 h-8" />
+                </div>
+                <h3 className="text-3xl serif mb-4">The Academy</h3>
+                <p className="text-white/70 mb-8 leading-relaxed">
+                  Learn the sacred arts of Ifa, herbalism, and traditional healing through our comprehensive training programs.
+                </p>
+              </div>
+              <Link to="/training" className="text-gold font-bold flex items-center gap-2 hover:gap-4 transition-all">
+                Start Learning <Plus size={16} />
+              </Link>
+            </motion.div>
+
+            {/* Gallery Card */}
+            <motion.div 
+              whileHover={{ y: -10 }}
+              className="md:col-span-8 bg-paper rounded-[2rem] p-10 flex flex-col md:flex-row-reverse gap-10 items-center border border-black/5"
+            >
+              <div className="flex-1">
+                <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center mb-6">
+                  <Youtube className="text-red-500 w-8 h-8" />
+                </div>
+                <h3 className="text-3xl serif mb-4">Video Teachings</h3>
+                <p className="text-earth/70 mb-8 leading-relaxed">
+                  Watch OBA ELA share profound insights into the Orisha traditions and the secrets of traditional medicine.
+                </p>
+                <Link to="/gallery" className="text-gold font-bold flex items-center gap-2 hover:gap-4 transition-all">
+                  Watch Now <Play size={16} />
+                </Link>
+              </div>
+              <div className="w-full md:w-1/2 aspect-video rounded-3xl overflow-hidden shadow-2xl bg-black">
+                 <img 
+                  src="https://picsum.photos/seed/temple/600/400" 
+                  alt="Temple" 
+                  className="w-full h-full object-cover opacity-80"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Immersive Temple Section */}
+      <section className="py-32 bg-[#0a0502] text-white relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none">
+          <div className="absolute top-0 left-0 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/dark-matter.png')]" />
+        </div>
+        
+        <div className="max-w-7xl mx-auto px-6 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-20 items-center">
+            <motion.div
+              initial={{ opacity: 0, x: -50 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+            >
+              <span className="text-gold uppercase tracking-widest text-sm mb-6 block serif">The Tradition</span>
+              <h2 className="text-5xl md:text-6xl serif mb-8">A Sanctuary for the Soul</h2>
+              <p className="text-white/60 text-lg mb-8 leading-relaxed">
+                OBA ELA TRADO is more than a healing center; it is a bridge between the physical and spiritual worlds. We preserve the ancient wisdom of the Yoruba people, bringing the power of the Orishas to those seeking truth and healing.
+              </p>
+              <ul className="space-y-4 mb-12">
+                {['Authentic Ifa Lineage', 'Traditional Herbal Knowledge', 'Spiritual Empowerment', 'Community Support'].map((item, i) => (
+                  <li key={i} className="flex items-center gap-4 text-white/80">
+                    <div className="w-2 h-2 rounded-full bg-gold" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <Link to="/consultation" className="inline-block px-10 py-4 bg-white text-black font-bold rounded-full hover:bg-gold transition-all">
+                Visit the Shrine
+              </Link>
+            </motion.div>
+            
+            <div className="relative">
+              <div className="aspect-[4/5] rounded-[3rem] overflow-hidden shadow-2xl relative z-10">
+                <img 
+                  src="https://picsum.photos/seed/shrine/800/1000" 
+                  alt="Sacred Shrine" 
+                  className="w-full h-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+              <div className="absolute -bottom-10 -right-10 w-64 h-64 bg-gold/20 rounded-full blur-3xl z-0" />
+              <div className="absolute -top-10 -left-10 w-64 h-64 bg-forest/20 rounded-full blur-3xl z-0" />
             </div>
           </div>
-        )}
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Link to="/consultation" className="p-6 bg-white rounded-2xl shadow-sm border border-black/5 hover:shadow-md transition-all">
-            <Calendar className="w-12 h-12 mb-4 mx-auto text-forest" />
-            <h3 className="text-xl font-semibold mb-2">Consultation</h3>
-            <p className="text-sm opacity-70">Book your Ifa divination or spiritual reading.</p>
-          </Link>
-          <Link to="/store" className="p-6 bg-white rounded-2xl shadow-sm border border-black/5 hover:shadow-md transition-all">
-            <ShoppingBag className="w-12 h-12 mb-4 mx-auto text-forest" />
-            <h3 className="text-xl font-semibold mb-2">Herbal Store</h3>
-            <p className="text-sm opacity-70">Authentic traditional medicines and spiritual items.</p>
-          </Link>
-          <Link to="/training" className="p-6 bg-white rounded-2xl shadow-sm border border-black/5 hover:shadow-md transition-all">
-            <BookOpen className="w-12 h-12 mb-4 mx-auto text-forest" />
-            <h3 className="text-xl font-semibold mb-2">Training</h3>
-            <p className="text-sm opacity-70">Learn the ancient wisdom of Ifa and herbalism.</p>
-          </Link>
         </div>
-      </motion.div>
+      </section>
+
+      {/* Newsletter / Join Section */}
+      {!user && (
+        <section className="py-24 bg-paper">
+          <div className="max-w-4xl mx-auto px-6 text-center">
+            <div className="bg-white p-12 md:p-20 rounded-[3rem] shadow-xl border border-black/5">
+              <h3 className="text-4xl serif mb-6">Join the Sacred Circle</h3>
+              <p className="text-earth/60 mb-10 text-lg">
+                Create an account to access our academy, track your spiritual journey, and receive updates from OBA ELA.
+              </p>
+              <div className="flex justify-center">
+                <Auth />
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
     </div>
   );
 };
@@ -2908,21 +3096,27 @@ export default function App() {
       </AnimatePresence>
 
       {/* Navigation */}
-      <nav className="bg-white border-b border-black/5 sticky top-0 z-50">
+      <nav className="bg-white/80 backdrop-blur-md border-b border-black/5 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between h-16 items-center">
-            <Link to="/" className="flex items-center gap-2">
-              <Leaf className="text-forest w-8 h-8" />
-              <span className="font-bold text-xl tracking-tight">OBA ELA</span>
+          <div className="flex justify-between h-20 items-center">
+            <Link to="/" className="flex items-center gap-3 group">
+              <div className="w-10 h-10 bg-forest rounded-xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-500">
+                <Leaf className="text-white w-6 h-6" />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-bold text-xl tracking-tight serif leading-none">OBA ELA</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-gold font-bold">Trado Medical</span>
+              </div>
             </Link>
             
             {/* Desktop Menu */}
-            <div className="hidden md:flex items-center gap-8">
-              <Link to="/consultation" className="text-sm font-medium hover:text-gold transition-colors">Consultation</Link>
-              <Link to="/store" className="text-sm font-medium hover:text-gold transition-colors">Store</Link>
-              <Link to="/orders" className="text-sm font-medium hover:text-gold transition-colors">Orders</Link>
-              <Link to="/training" className="text-sm font-medium hover:text-gold transition-colors">Academy</Link>
-              <Link to="/gallery" className="text-sm font-medium hover:text-gold transition-colors">Videos</Link>
+            <div className="hidden md:flex items-center gap-10">
+              <Link to="/consultation" className="text-sm font-semibold hover:text-gold transition-colors tracking-wide">Consultation</Link>
+              <Link to="/store" className="text-sm font-semibold hover:text-gold transition-colors tracking-wide">Store</Link>
+              <Link to="/orders" className="text-sm font-semibold hover:text-gold transition-colors tracking-wide">Orders</Link>
+              <Link to="/training" className="text-sm font-semibold hover:text-gold transition-colors tracking-wide">Academy</Link>
+              <Link to="/gallery" className="text-sm font-semibold hover:text-gold transition-colors tracking-wide">Videos</Link>
+              <div className="h-6 w-[1px] bg-black/10 mx-2" />
               <Auth />
               {(userProfile?.role === 'admin' || userProfile?.role === 'super-admin') && (
                 <button 
@@ -2931,10 +3125,10 @@ export default function App() {
                     if (!isAdminMode) navigate('/admin');
                     else navigate('/');
                   }}
-                  className={`p-2 rounded-full transition-all ${isAdminMode ? 'bg-gold text-white' : 'bg-forest text-white hover:bg-opacity-90'}`}
+                  className={`p-2.5 rounded-xl transition-all ${isAdminMode ? 'bg-gold text-white shadow-lg shadow-gold/20' : 'bg-forest text-white hover:bg-opacity-90 shadow-lg shadow-forest/20'}`}
                   title={isAdminMode ? "Switch to User View" : "Switch to Admin View"}
                 >
-                  <LayoutDashboard size={18} />
+                  <LayoutDashboard size={20} />
                 </button>
               )}
             </div>
