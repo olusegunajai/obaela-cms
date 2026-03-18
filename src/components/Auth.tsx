@@ -9,12 +9,17 @@ import {
 import { auth } from '../firebase';
 import { LogIn, LogOut, User as UserIcon } from 'lucide-react';
 
+import { authService } from '../services/authService';
+
 export const Auth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        await authService.ensureUserProfile(currentUser);
+      }
       setUser(currentUser);
       setLoading(false);
     });

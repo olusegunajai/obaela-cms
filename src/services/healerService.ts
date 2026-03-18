@@ -16,7 +16,8 @@ export interface Healer {
   specialty: string;
   bio: string;
   imageUrl?: string;
-  available: boolean;
+  availability: string;
+  createdAt?: { seconds: number; nanoseconds: number } | null;
 }
 
 const COLLECTION_NAME = 'healers';

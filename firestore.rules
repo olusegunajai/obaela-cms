@@ -14,8 +14,14 @@ service cloud.firestore {
 
     function isAdmin() {
       return isAuthenticated() && 
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super-admin'] ||
          request.auth.token.email == "dbest4real2009@gmail.com"); // Default admin
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && 
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super-admin' ||
+         request.auth.token.email == "dbest4real2009@gmail.com");
     }
 
     function hasOnlyAllowedFields(fields) {
@@ -28,7 +34,7 @@ service cloud.firestore {
     function isValidUser(data) {
       return data.uid is string &&
              data.email is string &&
-             data.role in ['admin', 'client'];
+             data.role in ['super-admin', 'admin', 'client'];
     }
 
     function isValidProduct(data) {
@@ -47,14 +53,21 @@ service cloud.firestore {
              data.paymentReference is string;
     }
 
+    function isValidHealer(data) {
+      return data.name is string && data.name.size() > 0 &&
+             data.specialty is string && data.specialty.size() > 0 &&
+             data.bio is string && data.bio.size() > 0 &&
+             data.availability is string && data.availability.size() > 0;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isSuperAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isSuperAdmin());
     }
 
     match /products/{productId} {
@@ -86,7 +99,7 @@ service cloud.firestore {
 
     match /healers/{healerId} {
       allow read: if true;
-      allow write: if isAdmin();
+      allow write: if isAdmin() && isValidHealer(request.resource.data);
     }
   }
 }

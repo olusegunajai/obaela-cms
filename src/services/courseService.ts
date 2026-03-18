@@ -8,7 +8,10 @@ import {
   query, 
   orderBy, 
   onSnapshot,
-  serverTimestamp
+  serverTimestamp,
+  where,
+  getDocs,
+  setDoc
 } from 'firebase/firestore';
 
 export interface Lesson {
@@ -18,7 +21,7 @@ export interface Lesson {
   content: string;
   videoUrl?: string;
   order: number;
-  createdAt: unknown;
+  createdAt: { seconds: number; nanoseconds: number } | null;
 }
 
 export interface Course {
@@ -28,7 +31,13 @@ export interface Course {
   instructor: string;
   price: number;
   thumbnailUrl?: string;
-  createdAt: unknown;
+  createdAt: { seconds: number; nanoseconds: number } | null;
+}
+
+export interface Enrollment {
+  courseId: string;
+  enrolledAt: { seconds: number; nanoseconds: number } | null;
+  progress: number;
 }
 
 export const courseService = {
@@ -96,6 +105,46 @@ export const courseService = {
         ...doc.data()
       })) as Lesson[];
       callback(lessons);
+    });
+  },
+
+  // Enrollment
+  async enrollInCourse(userId: string, courseId: string) {
+    const enrollmentRef = doc(db, `users/${userId}/enrollments`, courseId);
+    return setDoc(enrollmentRef, {
+      courseId,
+      enrolledAt: serverTimestamp(),
+      progress: 0
+    });
+  },
+
+  async checkEnrollment(userId: string, courseId: string) {
+    const q = query(collection(db, `users/${userId}/enrollments`), where('courseId', '==', courseId));
+    const snapshot = await getDocs(q);
+    return !snapshot.empty;
+  },
+
+  subscribeToEnrollments(userId: string, callback: (enrollments: Enrollment[]) => void) {
+    const q = query(collection(db, `users/${userId}/enrollments`));
+    return onSnapshot(q, (snapshot) => {
+      const enrollments = snapshot.docs.map(doc => doc.data()) as Enrollment[];
+      callback(enrollments);
+    });
+  },
+
+  async completeLesson(userId: string, courseId: string, lessonId: string) {
+    const completionRef = doc(db, `users/${userId}/enrollments/${courseId}/completions`, lessonId);
+    return setDoc(completionRef, {
+      lessonId,
+      completedAt: serverTimestamp()
+    });
+  },
+
+  subscribeToCompletions(userId: string, courseId: string, callback: (completions: string[]) => void) {
+    const q = query(collection(db, `users/${userId}/enrollments/${courseId}/completions`));
+    return onSnapshot(q, (snapshot) => {
+      const completions = snapshot.docs.map(doc => doc.id);
+      callback(completions);
     });
   }
 };

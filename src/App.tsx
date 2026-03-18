@@ -1,60 +1,82 @@
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate, useLocation, Routes, Route, Link } from 'react-router-dom';
+import { authService, UserProfile } from './services/authService';
 import { 
   LayoutDashboard, 
   ShoppingBag, 
   Calendar, 
-  BookOpen, 
   User, 
   Menu,
   X,
   Leaf,
-  Sparkles
+  Sparkles,
+  BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { Auth } from './components/Auth';
 import { consultationService, ConsultationType, Consultation as ConsultationData, ConsultationStatus } from './services/consultationService';
 import { auth, db } from './firebase';
-import { onAuthStateChanged } from 'firebase/auth';
+import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { productService, Product } from './services/productService';
 import { uploadImage } from './services/cloudinaryService';
-import { ShoppingCart, Plus, Trash2, Edit2, Upload, Loader2, CreditCard, Truck } from 'lucide-react';
+import { ShoppingCart, Plus, Trash2, Edit2, Upload, Loader2, CreditCard, Truck, Printer, MessageCircle, Send, X as CloseIcon } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { orderService, OrderStatus, Order } from './services/orderService';
-import { courseService, Course, Lesson } from './services/courseService';
+import { courseService, Course, Lesson, Enrollment } from './services/courseService';
 import { healerService, Healer } from './services/healerService';
+import { geminiService } from './services/geminiService';
 
 // Components
-const Home = () => (
-  <div className="p-8">
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="max-w-4xl mx-auto text-center"
-    >
-      <h1 className="text-5xl font-bold mb-6 gold-text">OBA ELA TRADO</h1>
-      <p className="text-xl mb-8 opacity-80">Traditional African Healing & Spiritual Guidance</p>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Link to="/consultation" className="p-6 bg-white rounded-2xl shadow-sm border border-black/5 hover:shadow-md transition-all">
-          <Calendar className="w-12 h-12 mb-4 mx-auto text-forest" />
-          <h3 className="text-xl font-semibold mb-2">Consultation</h3>
-          <p className="text-sm opacity-70">Book your Ifa divination or spiritual reading.</p>
-        </Link>
-        <Link to="/store" className="p-6 bg-white rounded-2xl shadow-sm border border-black/5 hover:shadow-md transition-all">
-          <ShoppingBag className="w-12 h-12 mb-4 mx-auto text-forest" />
-          <h3 className="text-xl font-semibold mb-2">Herbal Store</h3>
-          <p className="text-sm opacity-70">Authentic traditional medicines and spiritual items.</p>
-        </Link>
-        <Link to="/training" className="p-6 bg-white rounded-2xl shadow-sm border border-black/5 hover:shadow-md transition-all">
-          <BookOpen className="w-12 h-12 mb-4 mx-auto text-forest" />
-          <h3 className="text-xl font-semibold mb-2">Training</h3>
-          <p className="text-sm opacity-70">Learn the ancient wisdom of Ifa and herbalism.</p>
-        </Link>
-      </div>
-    </motion.div>
-  </div>
-);
+const Home = () => {
+  const [user, setUser] = useState(auth.currentUser);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
+    return unsubscribe;
+  }, []);
+
+  return (
+    <div className="p-8">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="max-w-4xl mx-auto text-center"
+      >
+        <h1 className="text-5xl font-bold mb-6 gold-text">OBA ELA TRADO</h1>
+        <p className="text-xl mb-8 opacity-80">Traditional African Healing & Spiritual Guidance</p>
+        
+        {!user && (
+          <div className="mb-12 p-8 bg-white rounded-3xl border border-black/5 shadow-sm inline-block">
+            <h3 className="text-xl font-bold mb-4">Join Our Community</h3>
+            <p className="opacity-60 mb-6">Create an account to access our academy, book consultations, and track your orders.</p>
+            <div className="flex justify-center">
+              <Auth />
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <Link to="/consultation" className="p-6 bg-white rounded-2xl shadow-sm border border-black/5 hover:shadow-md transition-all">
+            <Calendar className="w-12 h-12 mb-4 mx-auto text-forest" />
+            <h3 className="text-xl font-semibold mb-2">Consultation</h3>
+            <p className="text-sm opacity-70">Book your Ifa divination or spiritual reading.</p>
+          </Link>
+          <Link to="/store" className="p-6 bg-white rounded-2xl shadow-sm border border-black/5 hover:shadow-md transition-all">
+            <ShoppingBag className="w-12 h-12 mb-4 mx-auto text-forest" />
+            <h3 className="text-xl font-semibold mb-2">Herbal Store</h3>
+            <p className="text-sm opacity-70">Authentic traditional medicines and spiritual items.</p>
+          </Link>
+          <Link to="/training" className="p-6 bg-white rounded-2xl shadow-sm border border-black/5 hover:shadow-md transition-all">
+            <BookOpen className="w-12 h-12 mb-4 mx-auto text-forest" />
+            <h3 className="text-xl font-semibold mb-2">Training</h3>
+            <p className="text-sm opacity-70">Learn the ancient wisdom of Ifa and herbalism.</p>
+          </Link>
+        </div>
+      </motion.div>
+    </div>
+  );
+};
 
 const Store = () => {
   const [products, setProducts] = useState<Product[]>([]);
@@ -88,7 +110,7 @@ const Store = () => {
 
   const total = cart.reduce((sum, item) => sum + (item.product.price * item.quantity), 0);
 
-  const handleCheckoutComplete = async (reference: string, details: { name: string; email: string; phone: string; address: string }) => {
+  const handleCheckoutComplete = async (reference: string, details: { name: string, email: string, phone: string, address: string }) => {
     try {
       if (!auth.currentUser) {
         alert("Please sign in to complete your order.");
@@ -126,7 +148,7 @@ const Store = () => {
       setIsCheckoutOpen(false);
       setIsCartOpen(false);
       alert("Order placed successfully! You can track it in the Orders section.");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
       alert("Failed to save order. Please contact support.");
     }
@@ -292,7 +314,7 @@ const Store = () => {
     </div>
   );
 };
-const Checkout = ({ total, onComplete, onCancel }: { cart: {product: Product, quantity: number}[], total: number, onComplete: (ref: string, details: { name: string; email: string; phone: string; address: string }) => void, onCancel: () => void }) => {
+const Checkout = ({ total, onComplete, onCancel }: { cart: {product: Product, quantity: number}[], total: number, onComplete: (ref: string, details: { name: string, email: string, phone: string, address: string }) => void, onCancel: () => void }) => {
   const [email, setEmail] = useState(auth.currentUser?.email || '');
   const [name, setName] = useState(auth.currentUser?.displayName || '');
   const [phone, setPhone] = useState('');
@@ -494,198 +516,32 @@ const Orders = () => {
     </div>
   );
 };
-const Training = () => {
-  const [courses, setCourses] = useState<Course[]>([]);
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
-
-  useEffect(() => {
-    const unsubscribe = courseService.subscribeToCourses(setCourses);
-    return unsubscribe;
-  }, []);
-
-  if (selectedCourse) {
-    return <CourseDetail course={selectedCourse} onBack={() => setSelectedCourse(null)} />;
-  }
-
-  return (
-    <div className="p-8 max-w-7xl mx-auto">
-      <div className="mb-12 text-center">
-        <h1 className="text-4xl font-bold mb-4 gold-text">Ifa Training Academy</h1>
-        <p className="opacity-60 text-lg max-w-2xl mx-auto">
-          Deepen your spiritual knowledge through our structured courses on Ifa wisdom, herbalism, and traditional healing.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-        {courses.length === 0 ? (
-          <div className="col-span-full text-center py-20 opacity-50 italic">
-            New courses are being prepared. Check back soon!
-          </div>
-        ) : (
-          courses.map(course => (
-            <motion.div 
-              key={course.id}
-              whileHover={{ y: -5 }}
-              className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer"
-              onClick={() => setSelectedCourse(course)}
-            >
-              <div className="aspect-video bg-gray-100 relative">
-                <img 
-                  src={course.thumbnailUrl || `https://picsum.photos/seed/${course.title}/600/400`} 
-                  alt={course.title}
-                  className="w-full h-full object-cover"
-                  referrerPolicy="no-referrer"
-                />
-                <div className="absolute bottom-4 right-4 bg-forest text-white px-3 py-1 rounded-full text-sm font-bold">
-                  ₦{course.price.toLocaleString()}
-                </div>
-              </div>
-              <div className="p-6">
-                <h3 className="text-xl font-bold mb-2">{course.title}</h3>
-                <p className="text-sm opacity-60 line-clamp-2 mb-4">{course.description}</p>
-                <div className="flex items-center gap-2 text-xs font-bold text-gold uppercase tracking-wider">
-                  <User size={14} />
-                  {course.instructor}
-                </div>
-              </div>
-            </motion.div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-};
-
-const CourseDetail = ({ course, onBack }: { course: Course, onBack: () => void }) => {
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
-
-  useEffect(() => {
-    if (course.id) {
-      const unsubscribe = courseService.subscribeToLessons(course.id, (data) => {
-        setLessons(data);
-        if (data.length > 0 && !activeLesson) {
-          setActiveLesson(data[0]);
-        }
-      });
-      return unsubscribe;
-    }
-  }, [course.id, activeLesson]);
-
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="bg-white border-b border-black/5 p-4 sticky top-16 z-40">
-        <div className="max-w-7xl mx-auto flex items-center gap-4">
-          <button onClick={onBack} className="p-2 hover:bg-gray-100 rounded-full">
-            <X />
-          </button>
-          <h2 className="text-xl font-bold truncate">{course.title}</h2>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto p-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          {activeLesson ? (
-            <motion.div 
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="bg-white rounded-3xl p-8 shadow-sm border border-black/5"
-            >
-              <h1 className="text-3xl font-bold mb-6">{activeLesson.title}</h1>
-              {activeLesson.videoUrl && (
-                <div className="aspect-video bg-black rounded-2xl mb-8 overflow-hidden">
-                  <iframe 
-                    src={activeLesson.videoUrl.replace('watch?v=', 'embed/')} 
-                    className="w-full h-full"
-                    allowFullScreen
-                  />
-                </div>
-              )}
-              <div className="prose prose-forest max-w-none opacity-80 whitespace-pre-wrap">
-                {activeLesson.content}
-              </div>
-            </motion.div>
-          ) : (
-            <div className="bg-white rounded-3xl p-20 text-center opacity-50 italic border border-black/5">
-              Select a lesson to start learning
-            </div>
-          )}
-        </div>
-
-        <div className="lg:col-span-1">
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-black/5 sticky top-32">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <BookOpen className="text-forest" />
-              Course Content
-            </h3>
-            <div className="space-y-2">
-              {lessons.map((lesson, index) => (
-                <button
-                  key={lesson.id}
-                  onClick={() => setActiveLesson(lesson)}
-                  className={`w-full text-left p-4 rounded-2xl transition-all flex gap-4 items-center ${
-                    activeLesson?.id === lesson.id 
-                      ? 'bg-forest text-white shadow-md' 
-                      : 'hover:bg-gray-50'
-                  }`}
-                >
-                  <span className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${
-                    activeLesson?.id === lesson.id ? 'bg-white/20' : 'bg-gray-100'
-                  }`}>
-                    {index + 1}
-                  </span>
-                  <span className="font-medium">{lesson.title}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 const Admin = () => {
+  const [activeTab, setActiveTab] = useState<'consultations' | 'products' | 'orders' | 'users' | 'courses' | 'healers'>('consultations');
   const [allConsultations, setAllConsultations] = useState<ConsultationData[]>([]);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
-  const [allCourses, setAllCourses] = useState<Course[]>([]);
-  const [allHealers, setAllHealers] = useState<Healer[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
-  const [user, setUser] = useState(auth.currentUser);
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [activeTab, setActiveTab] = useState<'consultations' | 'products' | 'orders' | 'courses' | 'healers'>('consultations');
+  const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [healers, setHealers] = useState<Healer[]>([]);
+  const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-
-  // Healer Form State
-  const [healerForm, setHealerForm] = useState({
-    name: '',
-    specialty: '',
-    bio: '',
-    imageUrl: '',
-    available: true
-  });
-  const [editingHealer, setEditingHealer] = useState<Healer | null>(null);
-
-  // Course Form State
-  const [courseForm, setCourseForm] = useState({
-    title: '',
-    description: '',
-    instructor: 'Oba Ela',
-    price: 0,
-    thumbnailUrl: ''
-  });
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
-
-  // Lesson Form State
-  const [lessonForm, setLessonForm] = useState({
-    title: '',
-    content: '',
-    videoUrl: '',
-    order: 1
-  });
+  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+  const [editingHealer, setEditingHealer] = useState<Healer | null>(null);
   const [selectedCourseForLessons, setSelectedCourseForLessons] = useState<Course | null>(null);
-  const [courseLessons, setCourseLessons] = useState<Lesson[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [printingConsultation, setPrintingConsultation] = useState<ConsultationData | null>(null);
+
+  const handlePrint = (consultation: ConsultationData) => {
+    setPrintingConsultation(consultation);
+    setTimeout(() => {
+      window.print();
+      setPrintingConsultation(null);
+    }, 100);
+  };
 
   // Product Form State
   const [productForm, setProductForm] = useState({
@@ -697,6 +553,83 @@ const Admin = () => {
     stock: 10
   });
 
+  const [courseForm, setCourseForm] = useState({
+    title: '',
+    description: '',
+    instructor: '',
+    price: 0,
+    thumbnailUrl: ''
+  });
+
+  const [lessonForm, setLessonForm] = useState({
+    title: '',
+    content: '',
+    videoUrl: '',
+    order: 1
+  });
+
+  const [healerForm, setHealerForm] = useState({
+    name: '',
+    specialty: '',
+    bio: '',
+    availability: '',
+    imageUrl: ''
+  });
+
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      if (u) {
+        const profile = await authService.getUserProfile(u.uid);
+        setUserProfile(profile);
+      }
+    });
+
+    return unsubscribeAuth;
+  }, []);
+
+  useEffect(() => {
+    if (editingCourse) {
+      setCourseForm({
+        title: editingCourse.title,
+        description: editingCourse.description,
+        instructor: editingCourse.instructor,
+        price: editingCourse.price,
+        thumbnailUrl: editingCourse.thumbnailUrl || ''
+      });
+    }
+  }, [editingCourse]);
+
+  useEffect(() => {
+    if (editingLesson) {
+      setLessonForm({
+        title: editingLesson.title,
+        content: editingLesson.content,
+        videoUrl: editingLesson.videoUrl || '',
+        order: editingLesson.order
+      });
+    }
+  }, [editingLesson]);
+
+  useEffect(() => {
+    if (selectedCourseForLessons?.id) {
+      const unsubscribe = courseService.subscribeToLessons(selectedCourseForLessons.id, setLessons);
+      return unsubscribe;
+    }
+  }, [selectedCourseForLessons]);
+
+  useEffect(() => {
+    if (editingHealer) {
+      setHealerForm({
+        name: editingHealer.name,
+        specialty: editingHealer.specialty,
+        bio: editingHealer.bio,
+        availability: editingHealer.availability,
+        imageUrl: editingHealer.imageUrl || ''
+      });
+    }
+  }, [editingHealer]);
+
   useEffect(() => {
     if (editingProduct) {
       setProductForm({
@@ -707,59 +640,116 @@ const Admin = () => {
         imageUrl: editingProduct.imageUrl || '',
         stock: editingProduct.stock
       });
-    } else {
-      setProductForm({
-        name: '',
-        description: '',
-        price: 0,
-        category: 'Herbal Medicine',
-        imageUrl: '',
-        stock: 10
-      });
     }
   }, [editingProduct]);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (u) {
-        setIsAdmin(u.email === "dbest4real2009@gmail.com");
-      }
-    });
-
     let unsubscribeConsultations = () => {};
     let unsubscribeProducts = () => {};
     let unsubscribeOrders = () => {};
-    let unsubscribeCourses = () => {};
-    let unsubscribeHealers = () => {};
+    let unsubscribeUsers = () => {};
 
-    if (user && (user.email === "dbest4real2009@gmail.com")) {
+    if (userProfile?.role === 'admin' || userProfile?.role === 'super-admin') {
       const q = query(collection(db, 'consultations'), orderBy('createdAt', 'desc'));
       unsubscribeConsultations = onSnapshot(q, (snapshot) => {
         setAllConsultations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ConsultationData[]);
       });
       unsubscribeProducts = productService.subscribeToProducts(setProducts);
       unsubscribeOrders = orderService.subscribeToAllOrders(setAllOrders);
-      unsubscribeCourses = courseService.subscribeToCourses(setAllCourses);
-      unsubscribeHealers = healerService.subscribeToHealers(setAllHealers);
-    }
+      const unsubscribeCourses = courseService.subscribeToCourses(setCourses);
+      const unsubscribeHealers = healerService.subscribeToHealers(setHealers);
+      
+      if (userProfile.role === 'super-admin') {
+        unsubscribeUsers = authService.subscribeToAllUsers(setAllUsers);
+      }
 
-    return () => {
-      unsubscribeAuth();
-      unsubscribeConsultations();
-      unsubscribeProducts();
-      unsubscribeOrders();
-      unsubscribeCourses();
-      unsubscribeHealers();
-    };
-  }, [user]);
-
-  useEffect(() => {
-    if (selectedCourseForLessons?.id) {
-      const unsubscribe = courseService.subscribeToLessons(selectedCourseForLessons.id, setCourseLessons);
-      return unsubscribe;
+      return () => {
+        unsubscribeConsultations();
+        unsubscribeProducts();
+        unsubscribeOrders();
+        unsubscribeUsers();
+        unsubscribeCourses();
+        unsubscribeHealers();
+      };
     }
-  }, [selectedCourseForLessons]);
+  }, [userProfile]);
+
+  const handleUpdateUser = async (uid: string, data: Partial<UserProfile>) => {
+    try {
+      await authService.updateUserProfile(uid, data);
+      alert("User updated successfully");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to update user");
+    }
+  };
+
+  const handleSubmitCourse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingCourse?.id) {
+        await courseService.updateCourse(editingCourse.id, courseForm);
+        alert("Course updated successfully");
+        setEditingCourse(null);
+      } else {
+        await courseService.createCourse(courseForm);
+        alert("Course created successfully");
+      }
+      setCourseForm({ title: '', description: '', instructor: '', price: 0, thumbnailUrl: '' });
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save course");
+    }
+  };
+
+  const handleSubmitLesson = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedCourseForLessons?.id) return;
+    try {
+      if (editingLesson?.id) {
+        await courseService.updateLesson(selectedCourseForLessons.id, editingLesson.id, lessonForm);
+        alert("Lesson updated successfully");
+        setEditingLesson(null);
+      } else {
+        await courseService.addLesson(selectedCourseForLessons.id, lessonForm);
+        alert("Lesson added successfully");
+      }
+      setLessonForm({ title: '', content: '', videoUrl: '', order: lessons.length + 1 });
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save lesson");
+    }
+  };
+
+  const handleSubmitHealer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingHealer?.id) {
+        await healerService.updateHealer(editingHealer.id, healerForm);
+        alert("Healer updated successfully");
+        setEditingHealer(null);
+      } else {
+        await healerService.createHealer(healerForm);
+        alert("Healer added successfully");
+      }
+      setHealerForm({ name: '', specialty: '', bio: '', availability: '', imageUrl: '' });
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save healer");
+    }
+  };
+
+  const handleDeleteHealer = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this healer?")) {
+      try {
+        await healerService.deleteHealer(id);
+        alert("Healer deleted successfully");
+      } catch (error) {
+        console.error(error);
+        alert("Failed to delete healer");
+      }
+    }
+  };
 
   const updateStatus = async (id: string, status: ConsultationStatus) => {
     try {
@@ -806,55 +796,6 @@ const Admin = () => {
     }
   };
 
-  const handleSubmitCourse = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingCourse?.id) {
-        await courseService.updateCourse(editingCourse.id, courseForm);
-        alert("Course updated");
-        setEditingCourse(null);
-      } else {
-        await courseService.createCourse(courseForm);
-        alert("Course created");
-      }
-      setCourseForm({ title: '', description: '', instructor: 'Oba Ela', price: 0, thumbnailUrl: '' });
-    } catch (error) {
-      console.error(error);
-      alert("Failed to save course");
-    }
-  };
-
-  const handleSubmitLesson = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedCourseForLessons?.id) return;
-    try {
-      await courseService.addLesson(selectedCourseForLessons.id, lessonForm);
-      alert("Lesson added");
-      setLessonForm({ title: '', content: '', videoUrl: '', order: courseLessons.length + 1 });
-    } catch (error) {
-      console.error(error);
-      alert("Failed to add lesson");
-    }
-  };
-
-  const handleSubmitHealer = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingHealer?.id) {
-        await healerService.updateHealer(editingHealer.id, healerForm);
-        alert("Healer updated");
-        setEditingHealer(null);
-      } else {
-        await healerService.createHealer(healerForm);
-        alert("Healer added");
-      }
-      setHealerForm({ name: '', specialty: '', bio: '', imageUrl: '', available: true });
-    } catch (error) {
-      console.error(error);
-      alert("Failed to save healer");
-    }
-  };
-
   const handleDeleteProduct = async (id: string) => {
     try {
       await productService.deleteProduct(id);
@@ -870,7 +811,11 @@ const Admin = () => {
     setIsUploading(true);
     try {
       const url = await uploadImage(file);
-      setProductForm(prev => ({ ...prev, imageUrl: url }));
+      if (activeTab === 'products') {
+        setProductForm(prev => ({ ...prev, imageUrl: url }));
+      } else if (activeTab === 'healers') {
+        setHealerForm(prev => ({ ...prev, imageUrl: url }));
+      }
       alert("Image uploaded successfully!");
     } catch (error) {
       console.error(error);
@@ -880,7 +825,7 @@ const Admin = () => {
     }
   };
 
-  if (!isAdmin) {
+  if (userProfile?.role !== 'admin' && userProfile?.role !== 'super-admin') {
     return <div className="p-12 text-center text-red-500 font-bold">Access Denied. Admin only.</div>;
   }
 
@@ -911,7 +856,7 @@ const Admin = () => {
             onClick={() => setActiveTab('courses')}
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'courses' ? 'bg-white shadow-sm text-forest' : 'text-gray-500'}`}
           >
-            Courses
+            Academy
           </button>
           <button 
             onClick={() => setActiveTab('healers')}
@@ -919,6 +864,14 @@ const Admin = () => {
           >
             Healers
           </button>
+          {userProfile?.role === 'super-admin' && (
+            <button 
+              onClick={() => setActiveTab('users')}
+              className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'users' ? 'bg-white shadow-sm text-forest' : 'text-gray-500'}`}
+            >
+              Users
+            </button>
+          )}
         </div>
       </div>
       
@@ -944,12 +897,7 @@ const Admin = () => {
                   {allConsultations.map((c) => (
                     <tr key={c.id} className="border-b border-black/5 hover:bg-gray-50 transition-colors">
                       <td className="p-4 text-sm font-mono">{c.clientUid.slice(0, 8)}...</td>
-                      <td className="p-4 text-sm">
-                        <div>{c.type}</div>
-                        {c.healerName && (
-                          <div className="text-[10px] text-gold font-bold uppercase">Healer: {c.healerName}</div>
-                        )}
-                      </td>
+                      <td className="p-4 text-sm">{c.type}</td>
                       <td className="p-4 text-sm">{new Date(c.scheduledAt).toLocaleString()}</td>
                       <td className="p-4">
                         <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
@@ -960,23 +908,7 @@ const Admin = () => {
                           {c.status}
                         </span>
                       </td>
-                      <td className="p-4 flex gap-2 items-center">
-                        <select 
-                          className="text-[10px] p-1 rounded border border-gray-200 outline-none w-24"
-                          value={c.healerId || ''}
-                          onChange={(e) => {
-                            const h = allHealers.find(healer => healer.id === e.target.value);
-                            consultationService.updateConsultation(c.id!, { 
-                              healerId: h?.id || null, 
-                              healerName: h?.name || null 
-                            });
-                          }}
-                        >
-                          <option value="">Assign Healer</option>
-                          {allHealers.map(h => (
-                            <option key={h.id} value={h.id}>{h.name}</option>
-                          ))}
-                        </select>
+                      <td className="p-4 flex gap-2">
                         <button 
                           onClick={() => updateStatus(c.id!, ConsultationStatus.CONFIRMED)}
                           className="p-1 text-green-600 hover:bg-green-50 rounded"
@@ -989,6 +921,13 @@ const Admin = () => {
                         >
                           Complete
                         </button>
+                        <button 
+                          onClick={() => handlePrint(c)}
+                          className="p-1 text-forest hover:bg-forest/5 rounded"
+                          title="Print Record"
+                        >
+                          <Printer size={14} />
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -996,275 +935,6 @@ const Admin = () => {
               </table>
             </div>
           </section>
-        </div>
-      ) : activeTab === 'courses' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1 space-y-8">
-            <section className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
-              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                <BookOpen className="text-forest" />
-                {editingCourse ? 'Edit Course' : 'Create Course'}
-              </h3>
-              <form onSubmit={handleSubmitCourse} className="space-y-4">
-                <input 
-                  type="text" 
-                  placeholder="Course Title" 
-                  value={courseForm.title}
-                  onChange={e => setCourseForm({...courseForm, title: e.target.value})}
-                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                  required
-                />
-                <textarea 
-                  placeholder="Description" 
-                  value={courseForm.description}
-                  onChange={e => setCourseForm({...courseForm, description: e.target.value})}
-                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                  rows={3}
-                  required
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <input 
-                    type="number" 
-                    placeholder="Price (₦)" 
-                    value={courseForm.price || ''}
-                    onChange={e => setCourseForm({...courseForm, price: Number(e.target.value)})}
-                    className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                    required
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="Instructor" 
-                    value={courseForm.instructor}
-                    onChange={e => setCourseForm({...courseForm, instructor: e.target.value})}
-                    className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                    required
-                  />
-                </div>
-                <button 
-                  type="submit"
-                  className="w-full py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all"
-                >
-                  {editingCourse ? 'Update Course' : 'Create Course'}
-                </button>
-              </form>
-            </section>
-
-            {selectedCourseForLessons && (
-              <section className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
-                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                  <Plus className="text-forest" />
-                  Add Lesson to {selectedCourseForLessons.title}
-                </h3>
-                <form onSubmit={handleSubmitLesson} className="space-y-4">
-                  <input 
-                    type="text" 
-                    placeholder="Lesson Title" 
-                    value={lessonForm.title}
-                    onChange={e => setLessonForm({...lessonForm, title: e.target.value})}
-                    className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                    required
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="Video URL (YouTube)" 
-                    value={lessonForm.videoUrl}
-                    onChange={e => setLessonForm({...lessonForm, videoUrl: e.target.value})}
-                    className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                  />
-                  <textarea 
-                    placeholder="Lesson Content" 
-                    value={lessonForm.content}
-                    onChange={e => setLessonForm({...lessonForm, content: e.target.value})}
-                    className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                    rows={5}
-                    required
-                  />
-                  <button 
-                    type="submit"
-                    className="w-full py-3 bg-gold text-white rounded-xl font-bold hover:bg-opacity-90 transition-all"
-                  >
-                    Add Lesson
-                  </button>
-                </form>
-              </section>
-            )}
-          </div>
-
-          <div className="lg:col-span-2 space-y-8">
-            <section className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-black/5">
-                    <th className="p-4 text-sm font-bold">Course</th>
-                    <th className="p-4 text-sm font-bold">Price</th>
-                    <th className="p-4 text-sm font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allCourses.map((c) => (
-                    <tr key={c.id} className="border-b border-black/5 hover:bg-gray-50 transition-colors">
-                      <td className="p-4">
-                        <div className="font-bold text-sm">{c.title}</div>
-                        <div className="text-xs opacity-50">{c.instructor}</div>
-                      </td>
-                      <td className="p-4 text-sm font-bold">₦{c.price.toLocaleString()}</td>
-                      <td className="p-4 flex gap-2">
-                        <button 
-                          onClick={() => setSelectedCourseForLessons(c)}
-                          className="p-2 text-forest hover:bg-forest/5 rounded-full"
-                          title="Manage Lessons"
-                        >
-                          <BookOpen size={18} />
-                        </button>
-                        <button 
-                          onClick={() => setEditingCourse(c)}
-                          className="p-2 text-gold hover:bg-gold/5 rounded-full"
-                          title="Edit"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button 
-                          onClick={() => courseService.deleteCourse(c.id!)}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-full"
-                          title="Delete"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-
-            {selectedCourseForLessons && (
-              <section className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
-                <div className="p-4 bg-gray-50 border-b border-black/5 font-bold">
-                  Lessons for {selectedCourseForLessons.title}
-                </div>
-                <div className="divide-y divide-black/5">
-                  {courseLessons.map((l, idx) => (
-                    <div key={l.id} className="p-4 flex justify-between items-center">
-                      <div className="flex gap-4 items-center">
-                        <span className="text-xs font-bold opacity-30">{idx + 1}</span>
-                        <span className="text-sm font-medium">{l.title}</span>
-                      </div>
-                      <button 
-                        onClick={() => courseService.deleteLesson(selectedCourseForLessons.id!, l.id!)}
-                        className="text-red-500 hover:text-red-700"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </section>
-            )}
-          </div>
-        </div>
-      ) : activeTab === 'healers' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          <div className="lg:col-span-1">
-            <section className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm sticky top-24">
-              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
-                <User className="text-forest" />
-                {editingHealer ? 'Edit Healer' : 'Add Healer'}
-              </h3>
-              <form onSubmit={handleSubmitHealer} className="space-y-4">
-                <input 
-                  type="text" 
-                  placeholder="Healer Name" 
-                  value={healerForm.name}
-                  onChange={e => setHealerForm({...healerForm, name: e.target.value})}
-                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                  required
-                />
-                <input 
-                  type="text" 
-                  placeholder="Specialty" 
-                  value={healerForm.specialty}
-                  onChange={e => setHealerForm({...healerForm, specialty: e.target.value})}
-                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                  required
-                />
-                <textarea 
-                  placeholder="Bio" 
-                  value={healerForm.bio}
-                  onChange={e => setHealerForm({...healerForm, bio: e.target.value})}
-                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                  rows={3}
-                  required
-                />
-                <div className="flex items-center gap-2">
-                  <input 
-                    type="checkbox" 
-                    checked={healerForm.available}
-                    onChange={e => setHealerForm({...healerForm, available: e.target.checked})}
-                    id="healer-available"
-                  />
-                  <label htmlFor="healer-available" className="text-sm">Available for bookings</label>
-                </div>
-                <button 
-                  type="submit"
-                  className="w-full py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all"
-                >
-                  {editingHealer ? 'Update Healer' : 'Add Healer'}
-                </button>
-              </form>
-            </section>
-          </div>
-          <div className="lg:col-span-2">
-            <section className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-black/5">
-                    <th className="p-4 text-sm font-bold">Healer</th>
-                    <th className="p-4 text-sm font-bold">Specialty</th>
-                    <th className="p-4 text-sm font-bold">Status</th>
-                    <th className="p-4 text-sm font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allHealers.map((h) => (
-                    <tr key={h.id} className="border-b border-black/5 hover:bg-gray-50 transition-colors">
-                      <td className="p-4">
-                        <div className="font-bold text-sm">{h.name}</div>
-                      </td>
-                      <td className="p-4 text-sm">{h.specialty}</td>
-                      <td className="p-4">
-                        <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${h.available ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {h.available ? 'Available' : 'Busy'}
-                        </span>
-                      </td>
-                      <td className="p-4 flex gap-2">
-                        <button 
-                          onClick={() => {
-                            setEditingHealer(h);
-                            setHealerForm({
-                              name: h.name,
-                              specialty: h.specialty,
-                              bio: h.bio,
-                              imageUrl: h.imageUrl || '',
-                              available: h.available
-                            });
-                          }}
-                          className="p-2 text-gold hover:bg-gold/5 rounded-full"
-                        >
-                          <Edit2 size={18} />
-                        </button>
-                        <button 
-                          onClick={() => healerService.deleteHealer(h.id!)}
-                          className="p-2 text-red-500 hover:bg-red-50 rounded-full"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </section>
-          </div>
         </div>
       ) : activeTab === 'orders' ? (
         <div className="grid grid-cols-1 gap-8">
@@ -1290,11 +960,8 @@ const Admin = () => {
                       <td className="p-4">
                         <div className="font-bold text-sm">{o.customerName}</div>
                         <div className="text-xs opacity-50">{o.email}</div>
-                        <div className="text-xs opacity-50">{o.phone}</div>
                       </td>
-                      <td className="p-4 text-sm">
-                        {o.items.length} items
-                      </td>
+                      <td className="p-4 text-sm">{o.items.length} items</td>
                       <td className="p-4 text-sm font-bold">₦{o.totalAmount.toLocaleString()}</td>
                       <td className="p-4">
                         <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
@@ -1322,6 +989,451 @@ const Admin = () => {
               </table>
             </div>
           </section>
+        </div>
+      ) : activeTab === 'healers' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Add/Edit Healer Form */}
+          <div className="lg:col-span-1">
+            <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm sticky top-24">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-bold flex items-center gap-2">
+                  {editingHealer ? <Edit2 className="text-forest" /> : <Plus className="text-forest" />}
+                  {editingHealer ? 'Edit Healer' : 'Add New Healer'}
+                </h3>
+                {editingHealer && (
+                  <button 
+                    onClick={() => setEditingHealer(null)}
+                    className="text-xs text-red-500 hover:underline"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </div>
+              <form onSubmit={handleSubmitHealer} className="space-y-4">
+                <input 
+                  type="text" 
+                  placeholder="Healer Name" 
+                  value={healerForm.name}
+                  onChange={e => setHealerForm({...healerForm, name: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                <input 
+                  type="text" 
+                  placeholder="Specialty (e.g. Ifa Divination, Herbalism)" 
+                  value={healerForm.specialty}
+                  onChange={e => setHealerForm({...healerForm, specialty: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                <textarea 
+                  placeholder="Bio" 
+                  value={healerForm.bio}
+                  onChange={e => setHealerForm({...healerForm, bio: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  rows={4}
+                  required
+                />
+                <input 
+                  type="text" 
+                  placeholder="Availability (e.g. Mon-Fri, 9am-5pm)" 
+                  value={healerForm.availability}
+                  onChange={e => setHealerForm({...healerForm, availability: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-bold text-gray-500 flex items-center gap-2">
+                    <Upload size={14} />
+                    Healer Image
+                  </label>
+                  <div className="flex gap-4 items-center">
+                    <div className="relative flex-grow">
+                      <input 
+                        type="text" 
+                        placeholder="Image URL" 
+                        value={healerForm.imageUrl}
+                        onChange={e => setHealerForm({...healerForm, imageUrl: e.target.value})}
+                        className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest pr-12"
+                      />
+                      {healerForm.imageUrl && (
+                        <img 
+                          src={healerForm.imageUrl} 
+                          className="absolute right-2 top-2 w-8 h-8 rounded object-cover border border-gray-200"
+                          referrerPolicy="no-referrer"
+                        />
+                      )}
+                    </div>
+                    <label className={`cursor-pointer p-3 rounded-xl border border-dashed border-gray-300 hover:border-forest hover:bg-forest/5 transition-all flex items-center justify-center ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                      {isUploading ? <Loader2 className="animate-spin text-forest" /> : <Plus className="text-forest" />}
+                      <input 
+                        type="file" 
+                        className="hidden" 
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        disabled={isUploading}
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                <button 
+                  type="submit" 
+                  disabled={isUploading}
+                  className={`w-full py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                >
+                  {editingHealer ? 'Update Healer' : 'Save Healer'}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Healer List */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-black/5">
+                    <th className="p-4 text-sm font-bold">Healer</th>
+                    <th className="p-4 text-sm font-bold">Specialty</th>
+                    <th className="p-4 text-sm font-bold">Availability</th>
+                    <th className="p-4 text-sm font-bold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {healers.map((h) => (
+                    <tr key={h.id} className="border-b border-black/5 hover:bg-gray-50 transition-colors">
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={h.imageUrl || `https://picsum.photos/seed/${h.name}/50/50`} 
+                            className="w-10 h-10 rounded-lg object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div>
+                            <div className="font-bold text-sm">{h.name}</div>
+                            <div className="text-[10px] opacity-50 truncate max-w-[150px]">{h.bio}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4 text-sm">{h.specialty}</td>
+                      <td className="p-4 text-sm">{h.availability}</td>
+                      <td className="p-4">
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setEditingHealer(h)}
+                            className="p-2 text-forest hover:bg-forest/5 rounded-full transition-colors"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteHealer(h.id!)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'users' ? (
+        <div className="grid grid-cols-1 gap-8">
+          <section>
+            <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
+              <User className="text-forest" />
+              Manage Users & Roles
+            </h3>
+            <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-black/5">
+                    <th className="p-4 text-sm font-bold">User</th>
+                    <th className="p-4 text-sm font-bold">Role</th>
+                    <th className="p-4 text-sm font-bold">Level</th>
+                    <th className="p-4 text-sm font-bold">Category</th>
+                    <th className="p-4 text-sm font-bold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allUsers.map((u) => (
+                    <tr key={u.uid} className="border-b border-black/5 hover:bg-gray-50 transition-colors">
+                      <td className="p-4">
+                        <div className="font-bold text-sm">{u.displayName}</div>
+                        <div className="text-xs opacity-50">{u.email}</div>
+                      </td>
+                      <td className="p-4">
+                        <select 
+                          value={u.role}
+                          onChange={(e) => handleUpdateUser(u.uid, { role: e.target.value as UserRole })}
+                          className="text-xs p-1 rounded border border-gray-200 outline-none"
+                          disabled={u.uid === user?.uid}
+                        >
+                          <option value="client">Client</option>
+                          <option value="admin">Admin</option>
+                          <option value="super-admin">Super Admin</option>
+                        </select>
+                      </td>
+                      <td className="p-4">
+                        <input 
+                          type="number" 
+                          min="1" 
+                          max="5"
+                          value={u.adminLevel || ''}
+                          onChange={(e) => handleUpdateUser(u.uid, { adminLevel: Number(e.target.value) })}
+                          className="w-16 text-xs p-1 rounded border border-gray-200 outline-none"
+                          placeholder="Level"
+                        />
+                      </td>
+                      <td className="p-4">
+                        <input 
+                          type="text" 
+                          value={u.adminCategory || ''}
+                          onChange={(e) => handleUpdateUser(u.uid, { adminCategory: e.target.value })}
+                          className="text-xs p-1 rounded border border-gray-200 outline-none"
+                          placeholder="Category"
+                        />
+                      </td>
+                      <td className="p-4">
+                        <button 
+                          onClick={() => alert("More actions coming soon")}
+                          className="text-xs text-forest hover:underline"
+                        >
+                          Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </div>
+      ) : activeTab === 'courses' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Add/Edit Course Form */}
+          <div className="lg:col-span-1">
+            <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm sticky top-24">
+              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                {editingCourse ? <Edit2 className="text-forest" /> : <Plus className="text-forest" />}
+                {editingCourse ? 'Edit Course' : 'Add New Course'}
+              </h3>
+              <form onSubmit={handleSubmitCourse} className="space-y-4">
+                <input 
+                  type="text" 
+                  placeholder="Course Title" 
+                  value={courseForm.title}
+                  onChange={e => setCourseForm({...courseForm, title: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                <textarea 
+                  placeholder="Description" 
+                  value={courseForm.description}
+                  onChange={e => setCourseForm({...courseForm, description: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  rows={3}
+                  required
+                />
+                <input 
+                  type="text" 
+                  placeholder="Instructor Name" 
+                  value={courseForm.instructor}
+                  onChange={e => setCourseForm({...courseForm, instructor: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                <input 
+                  type="number" 
+                  placeholder="Price (₦)" 
+                  value={courseForm.price || ''}
+                  onChange={e => setCourseForm({...courseForm, price: Number(e.target.value)})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                <input 
+                  type="text" 
+                  placeholder="Thumbnail URL" 
+                  value={courseForm.thumbnailUrl}
+                  onChange={e => setCourseForm({...courseForm, thumbnailUrl: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                />
+                <button 
+                  type="submit" 
+                  className="w-full py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all"
+                >
+                  {editingCourse ? 'Update Course' : 'Save Course'}
+                </button>
+                {editingCourse && (
+                  <button 
+                    type="button"
+                    onClick={() => setEditingCourse(null)}
+                    className="w-full py-2 text-sm text-red-500 hover:underline"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </form>
+
+              {selectedCourseForLessons && (
+                <div className="mt-12 pt-8 border-t border-black/5">
+                  <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                    <BookOpen className="text-forest" />
+                    Manage Lessons
+                  </h3>
+                  <form onSubmit={handleSubmitLesson} className="space-y-4">
+                    <input 
+                      type="text" 
+                      placeholder="Lesson Title" 
+                      value={lessonForm.title}
+                      onChange={e => setLessonForm({...lessonForm, title: e.target.value})}
+                      className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                      required
+                    />
+                    <textarea 
+                      placeholder="Content" 
+                      value={lessonForm.content}
+                      onChange={e => setLessonForm({...lessonForm, content: e.target.value})}
+                      className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                      rows={3}
+                      required
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="Video URL (Embed)" 
+                      value={lessonForm.videoUrl}
+                      onChange={e => setLessonForm({...lessonForm, videoUrl: e.target.value})}
+                      className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                    />
+                    <input 
+                      type="number" 
+                      placeholder="Order" 
+                      value={lessonForm.order}
+                      onChange={e => setLessonForm({...lessonForm, order: Number(e.target.value)})}
+                      className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                      required
+                    />
+                    <button 
+                      type="submit" 
+                      className="w-full py-3 bg-gold text-white rounded-xl font-bold hover:bg-opacity-90 transition-all"
+                    >
+                      {editingLesson ? 'Update Lesson' : 'Add Lesson'}
+                    </button>
+                    {editingLesson && (
+                      <button 
+                        type="button"
+                        onClick={() => setEditingLesson(null)}
+                        className="w-full py-2 text-sm text-red-500 hover:underline"
+                      >
+                        Cancel Edit
+                      </button>
+                    )}
+                  </form>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Course & Lesson List */}
+          <div className="lg:col-span-2 space-y-8">
+            <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-black/5">
+                    <th className="p-4 text-sm font-bold">Course</th>
+                    <th className="p-4 text-sm font-bold">Instructor</th>
+                    <th className="p-4 text-sm font-bold">Price</th>
+                    <th className="p-4 text-sm font-bold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {courses.map((c) => (
+                    <tr key={c.id} className={`border-b border-black/5 hover:bg-gray-50 transition-colors ${selectedCourseForLessons?.id === c.id ? 'bg-forest/5' : ''}`}>
+                      <td className="p-4">
+                        <div className="font-bold text-sm">{c.title}</div>
+                        <div className="text-xs opacity-50 truncate max-w-[200px]">{c.description}</div>
+                      </td>
+                      <td className="p-4 text-sm">{c.instructor}</td>
+                      <td className="p-4 text-sm font-bold">₦{c.price.toLocaleString()}</td>
+                      <td className="p-4">
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setSelectedCourseForLessons(c)}
+                            className="p-2 text-gold hover:bg-gold/5 rounded-full"
+                            title="Manage Lessons"
+                          >
+                            <BookOpen size={18} />
+                          </button>
+                          <button 
+                            onClick={() => setEditingCourse(c)}
+                            className="p-2 text-forest hover:bg-forest/5 rounded-full"
+                            title="Edit"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button 
+                            onClick={() => courseService.deleteCourse(c.id!)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-full"
+                            title="Delete"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {selectedCourseForLessons && (
+              <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
+                <div className="p-4 bg-gray-50 border-b border-black/5 font-bold text-sm">
+                  Lessons for: {selectedCourseForLessons.title}
+                </div>
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-black/5">
+                      <th className="p-4 text-sm font-bold">Order</th>
+                      <th className="p-4 text-sm font-bold">Title</th>
+                      <th className="p-4 text-sm font-bold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lessons.map((l) => (
+                      <tr key={l.id} className="border-b border-black/5 hover:bg-gray-50 transition-colors">
+                        <td className="p-4 text-sm">{l.order}</td>
+                        <td className="p-4 text-sm font-bold">{l.title}</td>
+                        <td className="p-4">
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => setEditingLesson(l)}
+                              className="p-2 text-forest hover:bg-forest/5 rounded-full"
+                              title="Edit"
+                            >
+                              <Edit2 size={18} />
+                            </button>
+                            <button 
+                              onClick={() => courseService.deleteLesson(selectedCourseForLessons.id!, l.id!)}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-full"
+                              title="Delete"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -1489,6 +1601,381 @@ const Admin = () => {
           </div>
         </div>
       )}
+
+      {/* Hidden Printable Area */}
+      {printingConsultation && <PrintableConsultation consultation={printingConsultation} />}
+    </div>
+  );
+};
+
+const Training = () => {
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
+  const [user, setUser] = useState(auth.currentUser);
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [completions, setCompletions] = useState<string[]>([]);
+  const [isEnrolling, setIsEnrolling] = useState(false);
+  const [view, setView] = useState<'catalog' | 'my-academy'>('catalog');
+
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsubscribeCourses = courseService.subscribeToCourses(setCourses);
+    
+    let unsubscribeEnrollments = () => {};
+    if (auth.currentUser) {
+      unsubscribeEnrollments = courseService.subscribeToEnrollments(auth.currentUser.uid, setEnrollments);
+    }
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeCourses();
+      unsubscribeEnrollments();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (selectedCourse?.id) {
+      const unsubscribeLessons = courseService.subscribeToLessons(selectedCourse.id, setLessons);
+      
+      let unsubscribeCompletions = () => {};
+      if (user) {
+        unsubscribeCompletions = courseService.subscribeToCompletions(user.uid, selectedCourse.id, setCompletions);
+      }
+
+      return () => {
+        unsubscribeLessons();
+        unsubscribeCompletions();
+      };
+    }
+  }, [selectedCourse, user]);
+
+  const isEnrolled = (courseId: string) => {
+    return enrollments.some(e => e.courseId === courseId);
+  };
+
+  const isLessonCompleted = (lessonId: string) => {
+    return completions.includes(lessonId);
+  };
+
+  const handleEnroll = async (courseId: string) => {
+    if (!user) return alert("Please login to enroll in courses.");
+    setIsEnrolling(true);
+    try {
+      await courseService.enrollInCourse(user.uid, courseId);
+      alert("Successfully enrolled!");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to enroll.");
+    } finally {
+      setIsEnrolling(false);
+    }
+  };
+
+  const handleCompleteLesson = async (lessonId: string) => {
+    if (!user || !selectedCourse) return;
+    try {
+      await courseService.completeLesson(user.uid, selectedCourse.id!, lessonId);
+    } catch (error) {
+      console.error(error);
+    }
+  };
+
+  if (activeLesson) {
+    const completed = isLessonCompleted(activeLesson.id!);
+    return (
+      <div className="max-w-6xl mx-auto p-8">
+        <button 
+          onClick={() => setActiveLesson(null)}
+          className="mb-6 flex items-center gap-2 text-forest font-bold hover:underline"
+        >
+          <X size={18} /> Back to Lessons
+        </button>
+        <div className="bg-white rounded-3xl shadow-sm border border-black/5 overflow-hidden">
+          {activeLesson.videoUrl && (
+            <div className="aspect-video bg-black">
+              <iframe 
+                src={activeLesson.videoUrl} 
+                className="w-full h-full"
+                allowFullScreen
+              />
+            </div>
+          )}
+          <div className="p-8">
+            <div className="flex justify-between items-start mb-6">
+              <div>
+                <h1 className="text-3xl font-bold mb-2">{activeLesson.title}</h1>
+                <p className="opacity-60">Lesson Content</p>
+              </div>
+              <button 
+                onClick={() => handleCompleteLesson(activeLesson.id!)}
+                disabled={completed}
+                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${
+                  completed 
+                    ? 'bg-green-100 text-green-700 cursor-default' 
+                    : 'bg-forest text-white hover:bg-opacity-90'
+                }`}
+              >
+                {completed ? (
+                  <>
+                    <Sparkles size={18} />
+                    Completed
+                  </>
+                ) : (
+                  "Mark as Completed"
+                )}
+              </button>
+            </div>
+            <div className="prose max-w-none opacity-80 whitespace-pre-wrap">
+              {activeLesson.content}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (selectedCourse) {
+    const enrolled = isEnrolled(selectedCourse.id!);
+    const progress = lessons.length > 0 ? (completions.length / lessons.length) * 100 : 0;
+
+    return (
+      <div className="max-w-6xl mx-auto p-8">
+        <button 
+          onClick={() => setSelectedCourse(null)}
+          className="mb-6 flex items-center gap-2 text-forest font-bold hover:underline"
+        >
+          <X size={18} /> Back to Courses
+        </button>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          <div className="lg:col-span-1">
+            <div className="bg-white rounded-3xl shadow-sm border border-black/5 overflow-hidden sticky top-24">
+              <img 
+                src={selectedCourse.thumbnailUrl || `https://picsum.photos/seed/${selectedCourse.title}/400/300`} 
+                className="w-full aspect-video object-cover"
+                referrerPolicy="no-referrer"
+              />
+              <div className="p-6">
+                <h1 className="text-2xl font-bold mb-2">{selectedCourse.title}</h1>
+                <p className="text-sm opacity-60 mb-4">Instructor: {selectedCourse.instructor}</p>
+                <p className="text-sm opacity-80 mb-6">{selectedCourse.description}</p>
+                
+                {enrolled && (
+                  <div className="mb-6">
+                    <div className="flex justify-between text-xs font-bold mb-2">
+                      <span>Course Progress</span>
+                      <span>{Math.round(progress)}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-forest transition-all duration-500" 
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {!enrolled ? (
+                  <button 
+                    onClick={() => handleEnroll(selectedCourse.id!)}
+                    disabled={isEnrolling}
+                    className="w-full py-3 bg-gold text-white rounded-xl font-bold hover:bg-opacity-90 transition-all disabled:opacity-50"
+                  >
+                    {isEnrolling ? "Enrolling..." : "Enroll in Course"}
+                  </button>
+                ) : (
+                  <div className="p-3 bg-forest/10 text-forest rounded-xl text-center font-bold text-sm">
+                    You are enrolled
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="lg:col-span-2">
+            <h2 className="text-2xl font-bold mb-6">Course Lessons</h2>
+            <div className="space-y-4">
+              {!enrolled ? (
+                <div className="p-12 bg-white rounded-3xl border border-black/5 text-center">
+                  <BookOpen className="w-12 h-12 mx-auto mb-4 text-gold opacity-20" />
+                  <h3 className="text-xl font-bold mb-2">Lessons are Locked</h3>
+                  <p className="opacity-60 mb-6">Enroll in this course to access all lessons and spiritual wisdom.</p>
+                  {!user && <div className="flex justify-center"><Auth /></div>}
+                </div>
+              ) : lessons.length === 0 ? (
+                <div className="p-8 bg-white rounded-2xl border border-black/5 text-center opacity-50 italic">
+                  No lessons available for this course yet.
+                </div>
+              ) : (
+                lessons.map((lesson, idx) => {
+                  const completed = isLessonCompleted(lesson.id!);
+                  return (
+                    <button 
+                      key={lesson.id}
+                      onClick={() => setActiveLesson(lesson)}
+                      className="w-full flex items-center gap-4 p-6 bg-white rounded-2xl border border-black/5 hover:border-gold hover:shadow-md transition-all text-left group"
+                    >
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors ${
+                        completed ? 'bg-green-100 text-green-700' : 'bg-forest/10 text-forest'
+                      }`}>
+                        {completed ? <Sparkles size={18} /> : idx + 1}
+                      </div>
+                      <div className="flex-grow">
+                        <h3 className="font-bold group-hover:text-gold transition-colors">{lesson.title}</h3>
+                        <p className="text-xs opacity-50">Lesson {idx + 1}</p>
+                      </div>
+                      {completed && <span className="text-[10px] font-bold text-green-600 uppercase tracking-widest">Completed</span>}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const displayedCourses = view === 'catalog' 
+    ? courses 
+    : courses.filter(c => isEnrolled(c.id!));
+
+  return (
+    <div className="max-w-7xl mx-auto p-8">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
+        <div>
+          <h1 className="text-4xl font-bold mb-2">Academy</h1>
+          <p className="opacity-60 text-lg">Learn the ancient wisdom of Ifa and traditional herbalism.</p>
+        </div>
+        {user && (
+          <div className="flex bg-gray-100 p-1 rounded-xl">
+            <button 
+              onClick={() => setView('catalog')}
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${view === 'catalog' ? 'bg-white shadow-sm text-forest' : 'text-gray-500'}`}
+            >
+              Catalog
+            </button>
+            <button 
+              onClick={() => setView('my-academy')}
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition-all ${view === 'my-academy' ? 'bg-white shadow-sm text-forest' : 'text-gray-500'}`}
+            >
+              My Academy ({enrollments.length})
+            </button>
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {displayedCourses.length === 0 ? (
+          <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-black/5 border-dashed">
+            <BookOpen className="w-16 h-16 mx-auto mb-4 text-gray-200" />
+            <p className="opacity-50 italic text-lg">
+              {view === 'catalog' ? "No courses available at the moment." : "You haven't enrolled in any courses yet."}
+            </p>
+            {view === 'my-academy' && (
+              <button 
+                onClick={() => setView('catalog')}
+                className="mt-4 text-forest font-bold hover:underline"
+              >
+                Browse Catalog
+              </button>
+            )}
+          </div>
+        ) : (
+          displayedCourses.map(course => (
+            <motion.div 
+              key={course.id}
+              whileHover={{ y: -5 }}
+              className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer group"
+              onClick={() => setSelectedCourse(course)}
+            >
+              <div className="aspect-video relative overflow-hidden">
+                <img 
+                  src={course.thumbnailUrl || `https://picsum.photos/seed/${course.title}/400/300`} 
+                  alt={course.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  referrerPolicy="no-referrer"
+                />
+                {isEnrolled(course.id!) && (
+                  <div className="absolute top-4 right-4 bg-forest text-white text-[10px] font-bold px-2 py-1 rounded-full uppercase tracking-widest shadow-lg">
+                    Enrolled
+                  </div>
+                )}
+              </div>
+              <div className="p-6">
+                <h3 className="text-xl font-bold mb-2 group-hover:text-gold transition-colors">{course.title}</h3>
+                <p className="text-sm opacity-60 mb-4 line-clamp-2">{course.description}</p>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs font-bold text-forest bg-forest/5 px-3 py-1 rounded-full">{course.instructor}</span>
+                  <span className="text-gold font-bold">₦{course.price.toLocaleString()}</span>
+                </div>
+              </div>
+            </motion.div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+const PrintableConsultation = ({ consultation }: { consultation: ConsultationData }) => {
+  return (
+    <div id="printable-area" className="hidden print:block font-serif">
+      <div className="text-center border-b-2 border-forest pb-6 mb-8">
+        <h1 className="text-4xl font-bold text-forest uppercase tracking-widest mb-2">OBA ELA TRADO</h1>
+        <p className="text-sm italic opacity-70">Traditional African Healing & Spiritual Guidance</p>
+        <div className="mt-4 text-xs opacity-50">
+          <p>Lagos, Nigeria | +234 800 000 0000</p>
+          <p>www.oba-ela-trado.com</p>
+        </div>
+      </div>
+
+      <div className="space-y-8">
+        <div className="flex justify-between items-center bg-gray-50 p-4 rounded-lg">
+          <div>
+            <h2 className="text-xl font-bold text-forest">{consultation.type}</h2>
+            <p className="text-sm opacity-60">Record ID: {consultation.id}</p>
+          </div>
+          <div className="text-right">
+            <p className="font-bold uppercase text-xs tracking-wider px-3 py-1 bg-forest/10 rounded-full inline-block">
+              {consultation.status}
+            </p>
+            <p className="text-sm mt-1">{new Date(consultation.scheduledAt).toLocaleString()}</p>
+          </div>
+        </div>
+
+        <section>
+          <h3 className="text-lg font-bold border-b border-gray-200 pb-2 mb-4 uppercase tracking-wider text-forest">Client Intentions / Questions</h3>
+          <div className="bg-white p-4 rounded border border-gray-100 italic text-gray-700 leading-relaxed">
+            "{consultation.questions}"
+          </div>
+        </section>
+
+        {consultation.results && (
+          <section>
+            <h3 className="text-lg font-bold border-b border-gray-200 pb-2 mb-4 uppercase tracking-wider text-forest">Consultation Result / Guidance</h3>
+            <div className="bg-white p-6 rounded border border-gray-100 text-gray-800 leading-relaxed whitespace-pre-wrap">
+              {consultation.results}
+            </div>
+          </section>
+        )}
+
+        <div className="mt-20 pt-10 border-t border-gray-200 grid grid-cols-2 gap-10">
+          <div className="text-center">
+            <div className="w-40 h-px bg-gray-400 mx-auto mb-2"></div>
+            <p className="text-xs uppercase font-bold opacity-50">Healer's Signature</p>
+          </div>
+          <div className="text-center">
+            <div className="w-40 h-px bg-gray-400 mx-auto mb-2"></div>
+            <p className="text-xs uppercase font-bold opacity-50">Date of Record</p>
+            <p className="text-[10px] opacity-40">{new Date().toLocaleDateString()}</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-12 text-center text-[10px] opacity-30 italic">
+        This is an official spiritual record from Oba Ela Trado. All information is confidential.
+      </div>
     </div>
   );
 };
@@ -1498,10 +1985,17 @@ const Consultation = () => {
   const [scheduledAt, setScheduledAt] = useState('');
   const [questions, setQuestions] = useState('');
   const [bookings, setBookings] = useState<ConsultationData[]>([]);
-  const [healers, setHealers] = useState<Healer[]>([]);
-  const [selectedHealer, setSelectedHealer] = useState<Healer | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [user, setUser] = useState(auth.currentUser);
+  const [printingConsultation, setPrintingConsultation] = useState<ConsultationData | null>(null);
+
+  const handlePrint = (consultation: ConsultationData) => {
+    setPrintingConsultation(consultation);
+    setTimeout(() => {
+      window.print();
+      setPrintingConsultation(null);
+    }, 100);
+  };
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (u) => setUser(u));
@@ -1511,14 +2005,9 @@ const Consultation = () => {
       unsubscribeConsultations = consultationService.subscribeToUserConsultations(setBookings);
     }
 
-    const unsubscribeHealers = healerService.subscribeToHealers((data) => {
-      setHealers(data.filter(h => h.available));
-    });
-
     return () => {
       unsubscribeAuth();
       unsubscribeConsultations();
-      unsubscribeHealers();
     };
   }, [user]);
 
@@ -1531,15 +2020,12 @@ const Consultation = () => {
       await consultationService.createConsultation({
         type,
         scheduledAt,
-        questions,
-        healerId: selectedHealer?.id,
-        healerName: selectedHealer?.name
+        questions
       });
       setScheduledAt('');
       setQuestions('');
-      setSelectedHealer(null);
       alert("Consultation booked successfully!");
-    } catch (error) {
+    } catch (error: unknown) {
       console.error(error);
       alert("Failed to book consultation.");
     } finally {
@@ -1558,33 +2044,7 @@ const Consultation = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-8">
-      {/* Healers Section */}
-      <section className="mb-16">
-        <h2 className="text-3xl font-bold mb-8 flex items-center gap-2">
-          <User className="text-forest" />
-          Meet Our Traditional Healers
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {healers.map(h => (
-            <div key={h.id} className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all">
-              <div className="w-16 h-16 rounded-2xl bg-forest/5 flex items-center justify-center mb-4">
-                <User className="text-forest" size={28} />
-              </div>
-              <h4 className="text-lg font-bold text-forest">{h.name}</h4>
-              <p className="text-xs font-bold text-gold uppercase mb-3">{h.specialty}</p>
-              <p className="text-sm opacity-70 line-clamp-3">{h.bio}</p>
-            </div>
-          ))}
-          {healers.length === 0 && (
-            <div className="col-span-full p-12 text-center bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-              <p className="text-sm opacity-50 italic">No healers currently available for online booking.</p>
-            </div>
-          )}
-        </div>
-      </section>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
+    <div className="max-w-6xl mx-auto p-8 grid grid-cols-1 lg:grid-cols-2 gap-12">
       {/* Booking Form */}
       <motion.div 
         initial={{ opacity: 0, x: -20 }}
@@ -1597,27 +2057,6 @@ const Consultation = () => {
         </h2>
         
         <form onSubmit={handleBooking} className="space-y-6">
-          <div>
-            <label className="block text-sm font-semibold mb-2">Select Healer (Optional)</label>
-            <div className="grid grid-cols-2 gap-4">
-              {healers.map(h => (
-                <button
-                  key={h.id}
-                  type="button"
-                  onClick={() => setSelectedHealer(selectedHealer?.id === h.id ? null : h)}
-                  className={`p-3 rounded-xl border text-left transition-all ${
-                    selectedHealer?.id === h.id 
-                      ? 'border-forest bg-forest/5 ring-2 ring-forest' 
-                      : 'border-gray-200 hover:border-forest/50'
-                  }`}
-                >
-                  <div className="font-bold text-sm">{h.name}</div>
-                  <div className="text-[10px] opacity-60">{h.specialty}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div>
             <label className="block text-sm font-semibold mb-2">Consultation Type</label>
             <select 
@@ -1677,12 +2116,7 @@ const Consultation = () => {
             bookings.map((b) => (
               <div key={b.id} className="p-4 bg-white rounded-2xl border border-black/5 shadow-sm">
                 <div className="flex justify-between items-start mb-2">
-                  <div>
-                    <h4 className="font-bold text-forest">{b.type}</h4>
-                    {b.healerName && (
-                      <p className="text-[10px] font-bold text-gold uppercase">With {b.healerName}</p>
-                    )}
-                  </div>
+                  <h4 className="font-bold text-forest">{b.type}</h4>
                   <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
                     b.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
                     b.status === 'confirmed' ? 'bg-green-100 text-green-700' :
@@ -1695,50 +2129,261 @@ const Consultation = () => {
                   {new Date(b.scheduledAt).toLocaleString()}
                 </p>
                 <p className="text-xs opacity-50 line-clamp-1">{b.questions}</p>
+                <div className="mt-3 pt-3 border-t border-black/5 flex justify-end">
+                  <button 
+                    onClick={() => handlePrint(b)}
+                    className="flex items-center gap-1 text-xs text-forest hover:underline font-bold"
+                  >
+                    <Printer size={12} />
+                    Print Record
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
       </motion.div>
+
+      {/* Hidden Printable Area */}
+      {printingConsultation && <PrintableConsultation consultation={printingConsultation} />}
     </div>
-  </div>
-);
+  );
+};
+
+const ChatBot = () => {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<{ role: "user" | "model", text: string }[]>([
+    { role: "model", text: "Greetings! I am your spiritual guide for OBA ELA TRADO. How may I assist you today?" }
+  ]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (scrollRef.current) {
+      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    }
+  }, [messages]);
+
+  const handleSend = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!input.trim() || isLoading) return;
+
+    const userMsg = input.trim();
+    setInput("");
+    setMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setIsLoading(true);
+
+    const history = messages.map(m => ({
+      role: m.role,
+      parts: [{ text: m.text }]
+    }));
+
+    const response = await geminiService.askQuestion(userMsg, history);
+    setMessages(prev => [...prev, { role: "model", text: response }]);
+    setIsLoading(false);
+  };
+
+  return (
+    <div className="fixed bottom-6 right-6 z-[100]">
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className="mb-4 w-[350px] sm:w-[400px] h-[500px] bg-white rounded-3xl shadow-2xl border border-black/5 flex flex-col overflow-hidden"
+          >
+            {/* Header */}
+            <div className="p-4 bg-forest text-white flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                  <Sparkles size={16} className="text-gold" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-sm">Spiritual Guide</h3>
+                  <p className="text-[10px] opacity-70">Powered by OBA ELA Wisdom</p>
+                </div>
+              </div>
+              <button onClick={() => setIsOpen(false)} className="p-1 hover:bg-white/10 rounded-lg transition-colors">
+                <CloseIcon size={20} />
+              </button>
+            </div>
+
+            {/* Messages */}
+            <div ref={scrollRef} className="flex-grow overflow-y-auto p-4 space-y-4 bg-gray-50/50">
+              {messages.map((m, i) => (
+                <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`max-w-[80%] p-3 rounded-2xl text-sm ${
+                    m.role === 'user' 
+                      ? 'bg-forest text-white rounded-tr-none' 
+                      : 'bg-white border border-black/5 text-gray-800 rounded-tl-none shadow-sm'
+                  }`}>
+                    {m.text}
+                  </div>
+                </div>
+              ))}
+              {isLoading && (
+                <div className="flex justify-start">
+                  <div className="bg-white border border-black/5 p-3 rounded-2xl rounded-tl-none shadow-sm">
+                    <div className="flex gap-1">
+                      <div className="w-1.5 h-1.5 bg-forest rounded-full animate-bounce" />
+                      <div className="w-1.5 h-1.5 bg-forest rounded-full animate-bounce [animation-delay:0.2s]" />
+                      <div className="w-1.5 h-1.5 bg-forest rounded-full animate-bounce [animation-delay:0.4s]" />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input */}
+            <form onSubmit={handleSend} className="p-4 bg-white border-t border-black/5 flex gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Ask your question..."
+                className="flex-grow p-2 text-sm rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                disabled={isLoading}
+              />
+              <button
+                type="submit"
+                disabled={!input.trim() || isLoading}
+                className="p-2 bg-forest text-white rounded-xl hover:bg-opacity-90 transition-all disabled:opacity-50"
+              >
+                <Send size={18} />
+              </button>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`w-14 h-14 rounded-full flex items-center justify-center shadow-2xl transition-all duration-300 ${
+          isOpen ? 'bg-white text-forest rotate-90' : 'bg-forest text-white hover:scale-110'
+        }`}
+      >
+        {isOpen ? <CloseIcon /> : <MessageCircle />}
+      </button>
+    </div>
+  );
 };
 
 export default function App() {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [isAdminMode, setIsAdminMode] = useState(false);
+  const [showAdminPrompt, setShowAdminPrompt] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const profile = await authService.ensureUserProfile(user);
+        setUserProfile(profile);
+        
+        // If admin/super-admin, show prompt if not already in admin mode
+        if (profile.role === 'admin' || profile.role === 'super-admin') {
+          if (location.pathname === '/') {
+            setShowAdminPrompt(true);
+          }
+        } else {
+          // Regular users redirect to home or dashboard if they were on admin
+          if (location.pathname.startsWith('/admin')) {
+            navigate('/');
+          }
+        }
+      } else {
+        setUserProfile(null);
+        setIsAdminMode(false);
+        setShowAdminPrompt(false);
+      }
+    });
+    return unsubscribe;
+  }, [navigate, location.pathname]);
+
+  const handleAdminChoice = (asAdmin: boolean) => {
+    setIsAdminMode(asAdmin);
+    setShowAdminPrompt(false);
+    if (asAdmin) {
+      navigate('/admin');
+    }
+  };
 
   return (
-    <Router>
-      <div className="min-h-screen flex flex-col">
-        {/* Navigation */}
-        <nav className="bg-white border-b border-black/5 sticky top-0 z-50">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between h-16 items-center">
-              <Link to="/" className="flex items-center gap-2">
-                <Leaf className="text-forest w-8 h-8" />
-                <span className="font-bold text-xl tracking-tight">OBA ELA</span>
-              </Link>
-              
-              {/* Desktop Menu */}
-              <div className="hidden md:flex items-center gap-8">
-                <Link to="/consultation" className="text-sm font-medium hover:text-gold transition-colors">Consultation</Link>
-                <Link to="/store" className="text-sm font-medium hover:text-gold transition-colors">Store</Link>
-                <Link to="/orders" className="text-sm font-medium hover:text-gold transition-colors">Orders</Link>
-                <Link to="/training" className="text-sm font-medium hover:text-gold transition-colors">Academy</Link>
-                <Auth />
-                <Link to="/admin" className="p-2 bg-forest text-white rounded-full hover:bg-opacity-90 transition-all">
-                  <LayoutDashboard size={18} />
-                </Link>
+    <div className="min-h-screen flex flex-col">
+      {/* Admin Mode Prompt */}
+      <AnimatePresence>
+        {showAdminPrompt && (
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white p-8 rounded-3xl shadow-2xl max-w-md w-full text-center"
+            >
+              <LayoutDashboard className="w-16 h-16 mx-auto mb-6 text-forest" />
+              <h2 className="text-2xl font-bold mb-4">Welcome back, {userProfile?.displayName}</h2>
+              <p className="opacity-60 mb-8">How would you like to view the site today?</p>
+              <div className="grid grid-cols-2 gap-4">
+                <button 
+                  onClick={() => handleAdminChoice(true)}
+                  className="py-4 bg-forest text-white rounded-2xl font-bold hover:bg-opacity-90 transition-all"
+                >
+                  Admin Dashboard
+                </button>
+                <button 
+                  onClick={() => handleAdminChoice(false)}
+                  className="py-4 bg-gray-100 text-forest rounded-2xl font-bold hover:bg-gray-200 transition-all"
+                >
+                  User View
+                </button>
               </div>
-
-              {/* Mobile Menu Button */}
-              <button className="md:hidden p-2" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-                {isMenuOpen ? <X /> : <Menu />}
-              </button>
-            </div>
+            </motion.div>
           </div>
-        </nav>
+        )}
+      </AnimatePresence>
+
+      {/* Navigation */}
+      <nav className="bg-white border-b border-black/5 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between h-16 items-center">
+            <Link to="/" className="flex items-center gap-2">
+              <Leaf className="text-forest w-8 h-8" />
+              <span className="font-bold text-xl tracking-tight">OBA ELA</span>
+            </Link>
+            
+            {/* Desktop Menu */}
+            <div className="hidden md:flex items-center gap-8">
+              <Link to="/consultation" className="text-sm font-medium hover:text-gold transition-colors">Consultation</Link>
+              <Link to="/store" className="text-sm font-medium hover:text-gold transition-colors">Store</Link>
+              <Link to="/orders" className="text-sm font-medium hover:text-gold transition-colors">Orders</Link>
+              <Link to="/training" className="text-sm font-medium hover:text-gold transition-colors">Academy</Link>
+              <Auth />
+              {(userProfile?.role === 'admin' || userProfile?.role === 'super-admin') && (
+                <button 
+                  onClick={() => {
+                    setIsAdminMode(!isAdminMode);
+                    if (!isAdminMode) navigate('/admin');
+                    else navigate('/');
+                  }}
+                  className={`p-2 rounded-full transition-all ${isAdminMode ? 'bg-gold text-white' : 'bg-forest text-white hover:bg-opacity-90'}`}
+                  title={isAdminMode ? "Switch to User View" : "Switch to Admin View"}
+                >
+                  <LayoutDashboard size={18} />
+                </button>
+              )}
+            </div>
+
+            {/* Mobile Menu Button */}
+            <button className="md:hidden p-2" onClick={() => setIsMenuOpen(!isMenuOpen)}>
+              {isMenuOpen ? <X /> : <Menu />}
+            </button>
+          </div>
+        </div>
+      </nav>
 
         {/* Mobile Menu Overlay */}
         <AnimatePresence>
@@ -1754,7 +2399,9 @@ export default function App() {
                 <Link to="/store" onClick={() => setIsMenuOpen(false)}>Store</Link>
                 <Link to="/orders" onClick={() => setIsMenuOpen(false)}>Orders</Link>
                 <Link to="/training" onClick={() => setIsMenuOpen(false)}>Academy</Link>
-                <Link to="/admin" onClick={() => setIsMenuOpen(false)}>Admin</Link>
+                {(userProfile?.role === 'admin' || userProfile?.role === 'super-admin') && (
+                  <Link to="/admin" onClick={() => { setIsMenuOpen(false); setIsAdminMode(true); }}>Admin</Link>
+                )}
               </div>
             </motion.div>
           )}
@@ -1768,9 +2415,18 @@ export default function App() {
             <Route path="/orders" element={<Orders />} />
             <Route path="/consultation" element={<Consultation />} />
             <Route path="/training" element={<Training />} />
-            <Route path="/admin" element={<Admin />} />
+            <Route 
+              path="/admin" 
+              element={
+                (userProfile?.role === 'admin' || userProfile?.role === 'super-admin') 
+                  ? <Admin /> 
+                  : <Home />
+              } 
+            />
           </Routes>
         </main>
+
+        <ChatBot />
 
         {/* Footer */}
         <footer className="bg-white border-t border-black/5 py-12">
@@ -1779,6 +2435,5 @@ export default function App() {
           </div>
         </footer>
       </div>
-    </Router>
   );
 }
