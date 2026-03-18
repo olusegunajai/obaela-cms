@@ -20,12 +20,14 @@ import { auth, db } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { productService, Product } from './services/productService';
 import { uploadImage } from './services/cloudinaryService';
-import { ShoppingCart, Plus, Trash2, Edit2, Upload, Loader2, CreditCard, Truck, Printer, MessageCircle, Send, X as CloseIcon } from 'lucide-react';
+import { ShoppingCart, Plus, Trash2, Edit2, Upload, Loader2, CreditCard, Truck, Printer, MessageCircle, Send, X as CloseIcon, Youtube, Play } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { orderService, OrderStatus, Order } from './services/orderService';
 import { courseService, Course, Lesson, Enrollment } from './services/courseService';
 import { healerService, Healer } from './services/healerService';
 import { geminiService } from './services/geminiService';
+import { videoService, YouTubeVideo } from './services/videoService';
+import { staffService, StaffMember } from './services/staffService';
 
 // Components
 const Home = () => {
@@ -517,7 +519,7 @@ const Orders = () => {
   );
 };
 const Admin = () => {
-  const [activeTab, setActiveTab] = useState<'consultations' | 'products' | 'orders' | 'users' | 'courses' | 'healers'>('consultations');
+  const [activeTab, setActiveTab] = useState<'consultations' | 'products' | 'orders' | 'users' | 'courses' | 'healers' | 'videos' | 'staff' | 'accounting'>('consultations');
   const [allConsultations, setAllConsultations] = useState<ConsultationData[]>([]);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -525,12 +527,16 @@ const Admin = () => {
   const [courses, setCourses] = useState<Course[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [healers, setHealers] = useState<Healer[]>([]);
+  const [allVideos, setAllVideos] = useState<YouTubeVideo[]>([]);
+  const [allStaff, setAllStaff] = useState<StaffMember[]>([]);
   const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
   const [editingHealer, setEditingHealer] = useState<Healer | null>(null);
+  const [editingVideo, setEditingVideo] = useState<YouTubeVideo | null>(null);
+  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [selectedCourseForLessons, setSelectedCourseForLessons] = useState<Course | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [printingConsultation, setPrintingConsultation] = useState<ConsultationData | null>(null);
@@ -574,6 +580,22 @@ const Admin = () => {
     bio: '',
     availability: '',
     imageUrl: ''
+  });
+
+  const [videoForm, setVideoForm] = useState({
+    title: '',
+    description: '',
+    youtubeId: '',
+    thumbnailUrl: ''
+  });
+
+  const [staffForm, setStaffForm] = useState({
+    name: '',
+    role: '',
+    email: '',
+    phone: '',
+    department: '',
+    status: 'active' as 'active' | 'inactive'
   });
 
   useEffect(() => {
@@ -631,6 +653,30 @@ const Admin = () => {
   }, [editingHealer]);
 
   useEffect(() => {
+    if (editingVideo) {
+      setVideoForm({
+        title: editingVideo.title,
+        description: editingVideo.description,
+        youtubeId: editingVideo.youtubeId,
+        thumbnailUrl: editingVideo.thumbnailUrl || ''
+      });
+    }
+  }, [editingVideo]);
+
+  useEffect(() => {
+    if (editingStaff) {
+      setStaffForm({
+        name: editingStaff.name,
+        role: editingStaff.role,
+        email: editingStaff.email,
+        phone: editingStaff.phone,
+        department: editingStaff.department,
+        status: editingStaff.status
+      });
+    }
+  }, [editingStaff]);
+
+  useEffect(() => {
     if (editingProduct) {
       setProductForm({
         name: editingProduct.name,
@@ -658,6 +704,8 @@ const Admin = () => {
       unsubscribeOrders = orderService.subscribeToAllOrders(setAllOrders);
       const unsubscribeCourses = courseService.subscribeToCourses(setCourses);
       const unsubscribeHealers = healerService.subscribeToHealers(setHealers);
+      const unsubscribeVideos = videoService.subscribeToVideos(setAllVideos);
+      const unsubscribeStaff = staffService.subscribeToStaff(setAllStaff);
       
       if (userProfile.role === 'super-admin') {
         unsubscribeUsers = authService.subscribeToAllUsers(setAllUsers);
@@ -670,6 +718,8 @@ const Admin = () => {
         unsubscribeUsers();
         unsubscribeCourses();
         unsubscribeHealers();
+        unsubscribeVideos();
+        unsubscribeStaff();
       };
     }
   }, [userProfile]);
@@ -736,6 +786,66 @@ const Admin = () => {
     } catch (error) {
       console.error(error);
       alert("Failed to save healer");
+    }
+  };
+
+  const handleSubmitVideo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingVideo?.id) {
+        await videoService.updateVideo(editingVideo.id, videoForm);
+        alert("Video updated successfully");
+        setEditingVideo(null);
+      } else {
+        await videoService.addVideo(videoForm);
+        alert("Video added successfully");
+      }
+      setVideoForm({ title: '', description: '', youtubeId: '', thumbnailUrl: '' });
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save video");
+    }
+  };
+
+  const handleDeleteVideo = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this video?")) {
+      try {
+        await videoService.deleteVideo(id);
+        alert("Video deleted successfully");
+      } catch (error) {
+        console.error(error);
+        alert("Failed to delete video");
+      }
+    }
+  };
+
+  const handleSubmitStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingStaff?.id) {
+        await staffService.updateStaff(editingStaff.id, staffForm);
+        alert("Staff updated successfully");
+        setEditingStaff(null);
+      } else {
+        await staffService.addStaff(staffForm);
+        alert("Staff added successfully");
+      }
+      setStaffForm({ name: '', role: '', email: '', phone: '', department: '', status: 'active' });
+    } catch (error) {
+      console.error(error);
+      alert("Failed to save staff");
+    }
+  };
+
+  const handleDeleteStaff = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this staff member?")) {
+      try {
+        await staffService.deleteStaff(id);
+        alert("Staff deleted successfully");
+      } catch (error) {
+        console.error(error);
+        alert("Failed to delete staff");
+      }
     }
   };
 
@@ -863,6 +973,24 @@ const Admin = () => {
             className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'healers' ? 'bg-white shadow-sm text-forest' : 'text-gray-500'}`}
           >
             Healers
+          </button>
+          <button 
+            onClick={() => setActiveTab('videos')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'videos' ? 'bg-white shadow-sm text-forest' : 'text-gray-500'}`}
+          >
+            Videos
+          </button>
+          <button 
+            onClick={() => setActiveTab('staff')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'staff' ? 'bg-white shadow-sm text-forest' : 'text-gray-500'}`}
+          >
+            Staff
+          </button>
+          <button 
+            onClick={() => setActiveTab('accounting')}
+            className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${activeTab === 'accounting' ? 'bg-white shadow-sm text-forest' : 'text-gray-500'}`}
+          >
+            Accounting
           </button>
           {userProfile?.role === 'super-admin' && (
             <button 
@@ -1139,6 +1267,349 @@ const Admin = () => {
                   ))}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'videos' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Add/Edit Video Form */}
+          <div className="lg:col-span-1">
+            <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm sticky top-24">
+              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                {editingVideo ? <Edit2 className="text-forest" /> : <Plus className="text-forest" />}
+                {editingVideo ? 'Edit Video' : 'Add New Video'}
+              </h3>
+              <form onSubmit={handleSubmitVideo} className="space-y-4">
+                <input 
+                  type="text" 
+                  placeholder="Video Title" 
+                  value={videoForm.title}
+                  onChange={e => setVideoForm({...videoForm, title: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                <textarea 
+                  placeholder="Description" 
+                  value={videoForm.description}
+                  onChange={e => setVideoForm({...videoForm, description: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  rows={3}
+                  required
+                />
+                <input 
+                  type="text" 
+                  placeholder="YouTube Video ID (e.g., dQw4w9WgXcQ)" 
+                  value={videoForm.youtubeId}
+                  onChange={e => setVideoForm({...videoForm, youtubeId: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                <input 
+                  type="text" 
+                  placeholder="Custom Thumbnail URL (Optional)" 
+                  value={videoForm.thumbnailUrl}
+                  onChange={e => setVideoForm({...videoForm, thumbnailUrl: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                />
+                <button 
+                  type="submit" 
+                  className="w-full py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all"
+                >
+                  {editingVideo ? 'Update Video' : 'Save Video'}
+                </button>
+                {editingVideo && (
+                  <button 
+                    type="button"
+                    onClick={() => setEditingVideo(null)}
+                    className="w-full py-2 text-sm text-red-500 hover:underline"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </form>
+            </div>
+          </div>
+
+          {/* Video List */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-black/5">
+                    <th className="p-4 text-sm font-bold">Video</th>
+                    <th className="p-4 text-sm font-bold">YouTube ID</th>
+                    <th className="p-4 text-sm font-bold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allVideos.map((v) => (
+                    <tr key={v.id} className="border-b border-black/5 hover:bg-gray-50 transition-colors">
+                      <td className="p-4">
+                        <div className="flex items-center gap-3">
+                          <img 
+                            src={v.thumbnailUrl || `https://img.youtube.com/vi/${v.youtubeId}/default.jpg`} 
+                            className="w-16 h-10 rounded-lg object-cover"
+                            referrerPolicy="no-referrer"
+                          />
+                          <div>
+                            <div className="font-bold text-sm">{v.title}</div>
+                            <div className="text-xs opacity-50 line-clamp-1">{v.description}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="p-4 text-sm font-mono">{v.youtubeId}</td>
+                      <td className="p-4">
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setEditingVideo(v)}
+                            className="p-2 text-forest hover:bg-forest/5 rounded-full"
+                            title="Edit"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteVideo(v.id!)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-full"
+                            title="Delete"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'staff' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Add/Edit Staff Form */}
+          <div className="lg:col-span-1">
+            <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm sticky top-24">
+              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                {editingStaff ? <Edit2 className="text-forest" /> : <Plus className="text-forest" />}
+                {editingStaff ? 'Edit Staff' : 'Add New Staff'}
+              </h3>
+              <form onSubmit={handleSubmitStaff} className="space-y-4">
+                <input 
+                  type="text" 
+                  placeholder="Full Name" 
+                  value={staffForm.name}
+                  onChange={e => setStaffForm({...staffForm, name: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                <input 
+                  type="text" 
+                  placeholder="Role" 
+                  value={staffForm.role}
+                  onChange={e => setStaffForm({...staffForm, role: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                <input 
+                  type="email" 
+                  placeholder="Email" 
+                  value={staffForm.email}
+                  onChange={e => setStaffForm({...staffForm, email: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                <input 
+                  type="text" 
+                  placeholder="Phone" 
+                  value={staffForm.phone}
+                  onChange={e => setStaffForm({...staffForm, phone: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                <input 
+                  type="text" 
+                  placeholder="Department" 
+                  value={staffForm.department}
+                  onChange={e => setStaffForm({...staffForm, department: e.target.value})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                  required
+                />
+                <select 
+                  value={staffForm.status}
+                  onChange={e => setStaffForm({...staffForm, status: e.target.value as 'active' | 'inactive'})}
+                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+                <button 
+                  type="submit" 
+                  className="w-full py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all"
+                >
+                  {editingStaff ? 'Update Staff' : 'Save Staff'}
+                </button>
+                {editingStaff && (
+                  <button 
+                    type="button"
+                    onClick={() => setEditingStaff(null)}
+                    className="w-full py-2 text-sm text-red-500 hover:underline"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+              </form>
+            </div>
+          </div>
+
+          {/* Staff List */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-black/5">
+                    <th className="p-4 text-sm font-bold">Staff</th>
+                    <th className="p-4 text-sm font-bold">Role/Dept</th>
+                    <th className="p-4 text-sm font-bold">Status</th>
+                    <th className="p-4 text-sm font-bold">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {allStaff.map((s) => (
+                    <tr key={s.id} className="border-b border-black/5 hover:bg-gray-50 transition-colors">
+                      <td className="p-4">
+                        <div className="font-bold text-sm">{s.name}</div>
+                        <div className="text-xs opacity-50">{s.email}</div>
+                      </td>
+                      <td className="p-4">
+                        <div className="text-sm font-bold">{s.role}</div>
+                        <div className="text-xs opacity-50">{s.department}</div>
+                      </td>
+                      <td className="p-4">
+                        <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
+                          s.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                        }`}>
+                          {s.status}
+                        </span>
+                      </td>
+                      <td className="p-4">
+                        <div className="flex gap-2">
+                          <button 
+                            onClick={() => setEditingStaff(s)}
+                            className="p-2 text-forest hover:bg-forest/5 rounded-full"
+                          >
+                            <Edit2 size={18} />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteStaff(s.id!)}
+                            className="p-2 text-red-500 hover:bg-red-50 rounded-full"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'accounting' ? (
+        <div className="space-y-8">
+          {/* Accounting Stats */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Total Revenue</p>
+              <h4 className="text-2xl font-bold text-forest">
+                ₦{(
+                  allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0) +
+                  allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? 10000 : 0), 0)
+                ).toLocaleString()}
+              </h4>
+            </div>
+            <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Store Revenue</p>
+              <h4 className="text-2xl font-bold text-forest">
+                ₦{allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0).toLocaleString()}
+              </h4>
+            </div>
+            <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Consultation Revenue</p>
+              <h4 className="text-2xl font-bold text-forest">
+                ₦{allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? 10000 : 0), 0).toLocaleString()}
+              </h4>
+            </div>
+            <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Pending Orders Value</p>
+              <h4 className="text-2xl font-bold text-gold">
+                ₦{allOrders.reduce((sum, o) => sum + (o.status === 'pending' ? o.totalAmount : 0), 0).toLocaleString()}
+              </h4>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Recent Transactions */}
+            <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
+              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                <CreditCard className="text-forest" />
+                Recent Transactions
+              </h3>
+              <div className="space-y-4">
+                {[...allOrders, ...allConsultations]
+                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                  .slice(0, 10)
+                  .map((t, i) => (
+                    <div key={i} className="flex justify-between items-center p-3 hover:bg-gray-50 rounded-xl transition-colors border-b border-black/5 last:border-0">
+                      <div>
+                        <p className="text-sm font-bold">{'items' in t ? 'Store Order' : 'Consultation'}</p>
+                        <p className="text-xs opacity-50">{new Date(t.createdAt).toLocaleDateString()}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-forest">
+                          ₦{('totalAmount' in t ? t.totalAmount : 10000).toLocaleString()}
+                        </p>
+                        <p className={`text-[10px] font-bold uppercase ${
+                          t.status === 'cancelled' ? 'text-red-500' : 'text-green-500'
+                        }`}>
+                          {t.status}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            {/* Revenue Breakdown */}
+            <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
+              <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                <LayoutDashboard className="text-forest" />
+                Revenue Breakdown
+              </h3>
+              <div className="space-y-6">
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span>Store Products</span>
+                    <span className="font-bold">₦{allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0).toLocaleString()}</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-forest" 
+                      style={{ width: `${(allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0) / (allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0) + allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? 10000 : 0), 0)) * 100) || 0}%` }}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-2">
+                    <span>Consultations</span>
+                    <span className="font-bold">₦{allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? 10000 : 0), 0).toLocaleString()}</span>
+                  </div>
+                  <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div 
+                      className="h-full bg-gold" 
+                      style={{ width: `${(allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? 10000 : 0), 0) / (allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0) + allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? 10000 : 0), 0)) * 100) || 0}%` }}
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2150,6 +2621,96 @@ const Consultation = () => {
   );
 };
 
+const Gallery = () => {
+  const [videos, setVideos] = useState<YouTubeVideo[]>([]);
+  const [selectedVideo, setSelectedVideo] = useState<YouTubeVideo | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = videoService.subscribeToVideos(setVideos);
+    return unsubscribe;
+  }, []);
+
+  return (
+    <div className="max-w-7xl mx-auto p-8">
+      <div className="mb-12">
+        <h1 className="text-4xl font-bold mb-2">Video Gallery</h1>
+        <p className="opacity-60 text-lg">Watch spiritual teachings and traditional healing insights from OBA ELA.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {videos.length === 0 ? (
+          <div className="col-span-full py-20 text-center bg-white rounded-3xl border border-black/5 border-dashed">
+            <Youtube className="w-16 h-16 mx-auto mb-4 text-gray-200" />
+            <p className="opacity-50 italic text-lg">No videos available at the moment. Please check back later.</p>
+          </div>
+        ) : (
+          videos.map(video => (
+            <motion.div 
+              key={video.id}
+              whileHover={{ y: -5 }}
+              className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm hover:shadow-md transition-all cursor-pointer group"
+              onClick={() => setSelectedVideo(video)}
+            >
+              <div className="aspect-video relative overflow-hidden">
+                <img 
+                  src={video.thumbnailUrl || `https://img.youtube.com/vi/${video.youtubeId}/maxresdefault.jpg`} 
+                  alt={video.title}
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                  referrerPolicy="no-referrer"
+                />
+                <div className="absolute inset-0 bg-black/20 group-hover:bg-black/40 transition-colors flex items-center justify-center">
+                  <div className="w-12 h-12 rounded-full bg-white/90 text-forest flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform">
+                    <Play size={24} fill="currentColor" />
+                  </div>
+                </div>
+              </div>
+              <div className="p-6">
+                <h3 className="text-xl font-bold mb-2 group-hover:text-gold transition-colors">{video.title}</h3>
+                <p className="text-sm opacity-60 line-clamp-2">{video.description}</p>
+              </div>
+            </motion.div>
+          ))
+        )}
+      </div>
+
+      {/* Video Modal */}
+      <AnimatePresence>
+        {selectedVideo && (
+          <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="bg-white rounded-3xl shadow-2xl max-w-5xl w-full overflow-hidden"
+            >
+              <div className="aspect-video bg-black">
+                <iframe 
+                  src={`https://www.youtube.com/embed/${selectedVideo.youtubeId}?autoplay=1`}
+                  className="w-full h-full border-0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allowFullScreen
+                />
+              </div>
+              <div className="p-8 flex justify-between items-start">
+                <div>
+                  <h2 className="text-2xl font-bold mb-2">{selectedVideo.title}</h2>
+                  <p className="opacity-60">{selectedVideo.description}</p>
+                </div>
+                <button 
+                  onClick={() => setSelectedVideo(null)}
+                  className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
 const ChatBot = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<{ role: "user" | "model", text: string }[]>([
@@ -2361,6 +2922,7 @@ export default function App() {
               <Link to="/store" className="text-sm font-medium hover:text-gold transition-colors">Store</Link>
               <Link to="/orders" className="text-sm font-medium hover:text-gold transition-colors">Orders</Link>
               <Link to="/training" className="text-sm font-medium hover:text-gold transition-colors">Academy</Link>
+              <Link to="/gallery" className="text-sm font-medium hover:text-gold transition-colors">Videos</Link>
               <Auth />
               {(userProfile?.role === 'admin' || userProfile?.role === 'super-admin') && (
                 <button 
@@ -2399,6 +2961,7 @@ export default function App() {
                 <Link to="/store" onClick={() => setIsMenuOpen(false)}>Store</Link>
                 <Link to="/orders" onClick={() => setIsMenuOpen(false)}>Orders</Link>
                 <Link to="/training" onClick={() => setIsMenuOpen(false)}>Academy</Link>
+                <Link to="/gallery" onClick={() => setIsMenuOpen(false)}>Videos</Link>
                 {(userProfile?.role === 'admin' || userProfile?.role === 'super-admin') && (
                   <Link to="/admin" onClick={() => { setIsMenuOpen(false); setIsAdminMode(true); }}>Admin</Link>
                 )}
@@ -2415,6 +2978,7 @@ export default function App() {
             <Route path="/orders" element={<Orders />} />
             <Route path="/consultation" element={<Consultation />} />
             <Route path="/training" element={<Training />} />
+            <Route path="/gallery" element={<Gallery />} />
             <Route 
               path="/admin" 
               element={
