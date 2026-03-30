@@ -19,7 +19,13 @@ export interface StaffMember {
   phone: string;
   department: string;
   status: 'active' | 'inactive';
+  profileVideoUrl?: string;
   joinedAt: { seconds: number; nanoseconds: number } | null;
+  isAdmin?: boolean;
+  permissions?: {
+    menuAccess: string[];
+    contentAccess: string[];
+  };
 }
 
 export const staffService = {

@@ -30,7 +30,11 @@ export const Auth = () => {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
-    } catch (error) {
+    } catch (error: unknown) {
+      if (error && typeof error === 'object' && 'code' in error && error.code === 'auth/popup-closed-by-user') {
+        // User closed the popup, no need to show an error
+        return;
+      }
       console.error("Login failed:", error);
     }
   };

@@ -28,6 +28,7 @@
         "category": { "type": "string" },
         "stock": { "type": "integer" },
         "imageUrl": { "type": "string", "format": "uri" },
+        "featured": { "type": "boolean", "description": "Whether the product is featured on the homepage" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "price", "category", "stock"]
@@ -88,6 +89,7 @@
       "properties": {
         "title": { "type": "string" },
         "description": { "type": "string" },
+        "category": { "type": "string" },
         "instructor": { "type": "string" },
         "price": { "type": "number" },
         "thumbnailUrl": { "type": "string", "format": "uri" },
@@ -109,9 +111,9 @@
       },
       "required": ["courseId", "title", "order"]
     },
-    "Healer": {
-      "title": "Healer",
-      "description": "Traditional healers and spiritual guides",
+    "Babalawo": {
+      "title": "Babalawo",
+      "description": "Traditional Babaláwos and spiritual guides",
       "type": "object",
       "properties": {
         "name": { "type": "string" },
@@ -122,15 +124,101 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "specialty", "bio", "availability"]
+    },
+    "StaffMember": {
+      "title": "StaffMember",
+      "description": "Information about clinic or temple staff",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "role": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "phone": { "type": "string" },
+        "department": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "profileVideoUrl": { "type": "string", "format": "uri", "description": "URL to the staff member's profile video" },
+        "joinedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "role", "email", "status"]
+    },
+    "YouTubeVideo": {
+      "title": "YouTubeVideo",
+      "description": "Educational or promotional YouTube videos",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "youtubeId": { "type": "string" },
+        "thumbnailUrl": { "type": "string", "format": "uri" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "youtubeId"]
+    },
+    "Page": {
+      "title": "Page",
+      "description": "Custom content pages for the website",
+      "type": "object",
+      "properties": {
+        "slug": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "isPublished": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["slug", "title", "content"]
+    },
+    "Setting": {
+      "title": "Setting",
+      "description": "Global application settings including theme",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "value": { "type": "object" }
+      },
+      "required": ["key", "value"]
+    },
+    "Review": {
+      "title": "Review",
+      "description": "Product reviews from customers",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "rating": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "text": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "userName", "rating", "text", "createdAt"]
+    },
+    "FAQ": {
+      "title": "FAQ",
+      "description": "Frequently Asked Questions",
+      "type": "object",
+      "properties": {
+        "question": { "type": "string" },
+        "answer": { "type": "string" },
+        "category": { "type": "string" },
+        "order": { "type": "integer" },
+        "isPublished": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["question", "answer", "order"]
     }
   },
   "firestore": {
     "users": { "schema": "User", "description": "Collection of user profiles" },
     "products": { "schema": "Product", "description": "Collection of herbal products" },
+    "products/{productId}/reviews": { "schema": "Review", "description": "Sub-collection of reviews for a specific product" },
     "consultations": { "schema": "Consultation", "description": "Collection of consultation bookings" },
     "orders": { "schema": "Order", "description": "Collection of product orders" },
     "courses": { "schema": "Course", "description": "Collection of training courses" },
     "courses/{courseId}/lessons": { "schema": "Lesson", "description": "Sub-collection of lessons for a specific course" },
-    "healers": { "schema": "Healer", "description": "Collection of traditional healers" }
+    "babalawos": { "schema": "Babalawo", "description": "Collection of traditional Babaláwos" },
+    "staff": { "schema": "StaffMember", "description": "Collection of staff members" },
+    "videos": { "schema": "YouTubeVideo", "description": "Collection of YouTube videos" },
+    "pages": { "schema": "Page", "description": "Collection of custom content pages" },
+    "settings": { "schema": "Setting", "description": "Collection of global application settings" },
+    "faqs": { "schema": "FAQ", "description": "Collection of frequently asked questions" }
   }
 }

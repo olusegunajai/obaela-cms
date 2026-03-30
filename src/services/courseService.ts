@@ -20,6 +20,8 @@ export interface Lesson {
   title: string;
   content: string;
   videoUrl?: string;
+  audioUrl?: string;
+  requiredLevel?: number; // 0: public, 1: client, 2: admin
   order: number;
   createdAt: { seconds: number; nanoseconds: number } | null;
 }
@@ -28,6 +30,7 @@ export interface Course {
   id?: string;
   title: string;
   description: string;
+  category?: string;
   instructor: string;
   price: number;
   thumbnailUrl?: string;

@@ -17,6 +17,7 @@ export interface YouTubeVideo {
   description: string;
   youtubeId: string;
   thumbnailUrl?: string;
+  requiredLevel?: number; // 0: public, 1: client, 2: admin
   createdAt: { seconds: number; nanoseconds: number } | null;
 }
 
