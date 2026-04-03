@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import ReactMarkdown from 'react-markdown';
 import ReactPlayer from 'react-player';
 import { useNavigate, useLocation, Routes, Route, Link, useParams } from 'react-router-dom';
@@ -29,7 +29,7 @@ import { Auth } from './components/Auth';
 import { consultationService, ConsultationType, Consultation as ConsultationData, ConsultationStatus } from './services/consultationService';
 import { auth, db } from './firebase';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
-import { collection, query, orderBy, onSnapshot, doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, orderBy, onSnapshot, doc, setDoc, serverTimestamp, QueryDocumentSnapshot } from 'firebase/firestore';
 import { productService, Product } from './services/productService';
 import { uploadImage, uploadVideo } from './services/cloudinaryService';
 import { ShoppingCart, Plus, Trash2, Edit2, Upload, Loader2, Printer, MessageCircle, Send, X as CloseIcon, Play, Facebook, Instagram, Twitter, Star } from 'lucide-react';
@@ -43,6 +43,7 @@ import { staffService, StaffMember } from './services/staffService';
 import { seedService } from './services/seedService';
 import { pageService, Page } from './services/pageService';
 import { themeService, ThemeSettings } from './services/themeService';
+import { themes, Theme } from './themes';
 import { reviewService, Review } from './services/reviewService';
 import { faqService, FAQ } from './services/faqService';
 import { useToast } from './components/Toast';
@@ -528,6 +529,10 @@ const Store = () => {
   const { showToast } = useToast();
   const { currency } = useCurrency();
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<string[]>(['All']);
+  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
@@ -535,11 +540,63 @@ const Store = () => {
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [selectedProductForReviews, setSelectedProductForReviews] = useState<Product | null>(null);
+  const observer = useRef<IntersectionObserver | null>(null);
+  const lastProductElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (isLoading) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        fetchProducts();
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [isLoading, hasMore, fetchProducts]);
+
+  const PAGE_SIZE = 8;
+
+  const fetchProducts = useCallback(async (isFirstLoad = false, category = selectedCategory, featured = showFeaturedOnly) => {
+    if (isLoading || (!isFirstLoad && !hasMore)) return;
+    
+    setIsLoading(true);
+    try {
+      const result = await productService.getProducts(
+        PAGE_SIZE, 
+        isFirstLoad ? undefined : (lastVisible || undefined), 
+        category, 
+        featured
+      );
+      
+      if (isFirstLoad) {
+        setProducts(result.products);
+      } else {
+        setProducts(prev => [...prev, ...result.products]);
+      }
+      
+      setLastVisible(result.lastVisible || null);
+      setHasMore(result.products.length === PAGE_SIZE);
+    } catch (error) {
+      console.error("Error fetching products:", error);
+      showToast("Failed to load products.", "error");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [isLoading, hasMore, lastVisible, selectedCategory, showFeaturedOnly, showToast]);
 
   useEffect(() => {
-    const unsubscribe = productService.subscribeToProducts(setProducts);
-    return unsubscribe;
+    const fetchCategories = async () => {
+      try {
+        const cats = await productService.getAllCategories();
+        setCategories(['All', ...cats]);
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCategories();
   }, []);
+
+  useEffect(() => {
+    fetchProducts(true, selectedCategory, showFeaturedOnly);
+  }, [selectedCategory, showFeaturedOnly, fetchProducts]);
 
   const addToCart = (product: Product) => {
     setCart(prev => {
@@ -609,12 +666,8 @@ const Store = () => {
   const filteredProducts = products.filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          product.description.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || product.category === selectedCategory;
-    const matchesFeatured = !showFeaturedOnly || product.featured;
-    return matchesSearch && matchesCategory && matchesFeatured;
+    return matchesSearch;
   });
-
-  const categories = ['All', ...new Set(products.map(p => p.category))];
 
   return (
     <div className="min-h-screen bg-paper">
@@ -701,9 +754,10 @@ const Store = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12">
-          {filteredProducts.map(product => (
+          {filteredProducts.map((product, index) => (
             <motion.div 
               key={product.id}
+              ref={index === filteredProducts.length - 1 ? lastProductElementRef : null}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -766,6 +820,25 @@ const Store = () => {
             </motion.div>
           ))}
         </div>
+
+        {/* Loading Indicator for Infinite Scroll */}
+        {isLoading && (
+          <div className="mt-20 flex justify-center">
+            <Loader2 className="animate-spin w-10 h-10 text-forest" />
+          </div>
+        )}
+
+        {/* Fallback Load More Button if Observer fails or for accessibility */}
+        {!isLoading && hasMore && (
+          <div className="mt-20 flex justify-center">
+            <button
+              onClick={() => fetchProducts()}
+              className="px-12 py-4 bg-white border border-black/10 text-earth font-bold rounded-full hover:bg-gold hover:text-black hover:border-gold transition-all duration-500 flex items-center gap-3 shadow-xl"
+            >
+              "Load More Sacred Items"
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Cart Sidebar */}
@@ -1113,6 +1186,9 @@ const Admin = () => {
   const [allConsultations, setAllConsultations] = useState<ConsultationData[]>([]);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
+  const [lastVisibleProduct, setLastVisibleProduct] = useState<QueryDocumentSnapshot | null>(null);
+  const [hasMoreProducts, setHasMoreProducts] = useState(true);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(false);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
   const [userSearch, setUserSearch] = useState('');
   const [selectedUserForDetails, setSelectedUserForDetails] = useState<UserProfile | null>(null);
@@ -1182,6 +1258,35 @@ const Admin = () => {
     }, 100);
   };
 
+  const fetchAdminProducts = useCallback(async (isFirstLoad = false) => {
+    if (isLoadingProducts || (!isFirstLoad && !hasMoreProducts)) return;
+    setIsLoadingProducts(true);
+    try {
+      const result = await productService.getProducts(
+        10, 
+        isFirstLoad ? undefined : (lastVisibleProduct || undefined)
+      );
+      if (isFirstLoad) {
+        setProducts(result.products);
+      } else {
+        setProducts(prev => [...prev, ...result.products]);
+      }
+      setLastVisibleProduct(result.lastVisible || null);
+      setHasMoreProducts(result.products.length === 10);
+    } catch (error) {
+      console.error(error);
+      showToast("Failed to load products", "error");
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  }, [isLoadingProducts, hasMoreProducts, lastVisibleProduct, showToast]);
+
+  useEffect(() => {
+    if (activeTab === 'products') {
+      fetchAdminProducts(true);
+    }
+  }, [activeTab, fetchAdminProducts]);
+
   const [selectedConsultations, setSelectedConsultations] = useState<string[]>([]);
   const [selectedProducts, setSelectedProducts] = useState<string[]>([]);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
@@ -1229,7 +1334,7 @@ const Admin = () => {
 
   const handleBulkUpdateOrderStatus = async (status: string) => {
     try {
-      await Promise.all(selectedOrders.map(id => orderService.updateOrderStatus(id, status as any)));
+      await Promise.all(selectedOrders.map(id => orderService.updateOrderStatus(id, status as OrderStatus)));
       setSelectedOrders([]);
       showToast("Orders updated successfully", "success");
     } catch (error) {
@@ -1251,17 +1356,27 @@ const Admin = () => {
     });
   };
 
-  const [isPageModalOpen, setIsPageModalOpen] = useState(false);
   const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<UserProfile | null>(null);
   const [isVisualEditor, setIsVisualEditor] = useState(false);
   const [mediaFiles, setMediaFiles] = useState<{url: string, type: 'image' | 'video', name: string}[]>([]);
-  const [currentTheme, setCurrentTheme] = useState<ThemeSettings | null>(themes[0]);
+  const [pageForm, setPageForm] = useState<Partial<Page>>({
+    title: '',
+    slug: '',
+    content: '',
+    isPublished: false
+  });
+  const [currentTheme, setCurrentTheme] = useState<Theme>(themes[0]);
 
   useEffect(() => {
     const root = document.documentElement;
-    root.style.setProperty('--forest', currentTheme.options.primaryColor);
-    root.style.setProperty('--gold', currentTheme.options.accentColor);
-    root.style.setProperty('--paper', currentTheme.options.secondaryColor);
+    root.style.setProperty('--primary', currentTheme.options.primaryColor);
+    root.style.setProperty('--secondary', currentTheme.options.accentColor);
+    root.style.setProperty('--accent', currentTheme.options.secondaryColor);
+    root.style.setProperty('--bg', currentTheme.options.backgroundColor);
+    root.style.setProperty('--text', currentTheme.options.textColor);
+    root.style.setProperty('--font-serif-family', currentTheme.options.fontFamily);
+    root.style.setProperty('--radius', currentTheme.options.borderRadius);
+    root.style.setProperty('--glass-opacity', currentTheme.options.glassOpacity);
   }, [currentTheme]);
 
   const toggleMenuAccess = (uid: string, tabId: string) => {
@@ -1369,16 +1484,9 @@ const Admin = () => {
 
   const [pages, setPages] = useState<Page[]>([]);
   const [editingPage, setEditingPage] = useState<Page | null>(null);
-  const [pageForm, setPageForm] = useState({
-    slug: '',
-    title: '',
-    content: '',
-    isPublished: true
-  });
 
   const [themePrompt, setThemePrompt] = useState('');
   const [isGeneratingTheme, setIsGeneratingTheme] = useState(false);
-  const [currentTheme, setCurrentTheme] = useState<ThemeSettings | null>(null);
 
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
@@ -1424,7 +1532,13 @@ const Admin = () => {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = themeService.subscribeToTheme(setCurrentTheme);
+    const unsubscribe = themeService.subscribeToTheme((settings) => {
+      setCurrentTheme({
+        id: 'custom',
+        name: 'Custom Theme',
+        options: settings
+      });
+    });
     return unsubscribe;
   }, []);
 
@@ -1444,23 +1558,6 @@ const Admin = () => {
     }
   }, [editingPage]);
 
-  const handleSubmitPage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      if (editingPage?.id) {
-        await pageService.updatePage(editingPage.id, pageForm);
-        showToast("Page updated successfully", "success");
-        setEditingPage(null);
-      } else {
-        await pageService.createPage(pageForm);
-        showToast("Page created successfully", "success");
-      }
-      setPageForm({ slug: '', title: '', content: '', isPublished: true });
-    } catch (error) {
-      console.error(error);
-      showToast("Failed to save page", "error");
-    }
-  };
 
   const handleDeletePage = async (id: string) => {
     showConfirm(
@@ -1482,7 +1579,12 @@ const Admin = () => {
     if (!themePrompt) return;
     setIsGeneratingTheme(true);
     try {
-      const newTheme = await themeService.generateThemeAI(themePrompt);
+      const newThemeSettings = await themeService.generateThemeAI(themePrompt);
+      const newTheme: Theme = {
+        id: 'ai-generated',
+        name: 'AI Generated',
+        options: newThemeSettings
+      };
       setCurrentTheme(newTheme);
       showToast("Theme generated! Click 'Save Theme' to apply it.", "success");
     } catch (error) {
@@ -1496,7 +1598,7 @@ const Admin = () => {
   const handleSaveTheme = async () => {
     if (!currentTheme) return;
     try {
-      await themeService.saveTheme(currentTheme);
+      await themeService.saveTheme(currentTheme.options);
       showToast("Theme saved and applied successfully!", "success");
     } catch (error) {
       console.error(error);
@@ -1604,7 +1706,6 @@ const Admin = () => {
 
   useEffect(() => {
     let unsubscribeConsultations = () => {};
-    let unsubscribeProducts = () => {};
     let unsubscribeOrders = () => {};
     let unsubscribeUsers = () => {};
 
@@ -1613,7 +1714,6 @@ const Admin = () => {
       unsubscribeConsultations = onSnapshot(q, (snapshot) => {
         setAllConsultations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ConsultationData[]);
       });
-      unsubscribeProducts = productService.subscribeToProducts(setProducts);
       unsubscribeOrders = orderService.subscribeToAllOrders(setAllOrders);
       const unsubscribeCourses = courseService.subscribeToCourses(setCourses);
       const unsubscribeBabalawos = babalawoService.subscribeToBabalawos(setBabalawos);
@@ -1626,7 +1726,6 @@ const Admin = () => {
 
       return () => {
         unsubscribeConsultations();
-        unsubscribeProducts();
         unsubscribeOrders();
         unsubscribeUsers();
         unsubscribeCourses();
@@ -3310,6 +3409,58 @@ const Admin = () => {
                 />
               </div>
               <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Secondary Color</label>
+                <input 
+                  type="color" 
+                  value={currentTheme.options.secondaryColor}
+                  onChange={(e) => setCurrentTheme(prev => ({ ...prev, options: { ...prev.options, secondaryColor: e.target.value } }))}
+                  className="w-full h-12 rounded-xl border-none cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Background Color</label>
+                <input 
+                  type="color" 
+                  value={currentTheme.options.backgroundColor}
+                  onChange={(e) => setCurrentTheme(prev => ({ ...prev, options: { ...prev.options, backgroundColor: e.target.value } }))}
+                  className="w-full h-12 rounded-xl border-none cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Text Color</label>
+                <input 
+                  type="color" 
+                  value={currentTheme.options.textColor}
+                  onChange={(e) => setCurrentTheme(prev => ({ ...prev, options: { ...prev.options, textColor: e.target.value } }))}
+                  className="w-full h-12 rounded-xl border-none cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Font Family</label>
+                <select 
+                  value={currentTheme.options.fontFamily}
+                  onChange={(e) => setCurrentTheme(prev => ({ ...prev, options: { ...prev.options, fontFamily: e.target.value } }))}
+                  className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-forest"
+                >
+                  <option value="Inter, sans-serif">Inter (Sans)</option>
+                  <option value="'Cormorant Garamond', serif">Cormorant Garamond (Serif)</option>
+                  <option value="'Montserrat', sans-serif">Montserrat</option>
+                  <option value="'Playfair Display', serif">Playfair Display</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Glass Opacity</label>
+                <input 
+                  type="range" 
+                  min="0" 
+                  max="1" 
+                  step="0.05"
+                  value={currentTheme.options.glassOpacity}
+                  onChange={(e) => setCurrentTheme(prev => ({ ...prev, options: { ...prev.options, glassOpacity: e.target.value } }))}
+                  className="w-full h-12 cursor-pointer"
+                />
+              </div>
+              <div>
                 <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Border Radius</label>
                 <select 
                   value={currentTheme.options.borderRadius}
@@ -3327,7 +3478,7 @@ const Admin = () => {
                 <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Sidebar Style</label>
                 <select 
                   value={currentTheme.options.sidebarStyle}
-                  onChange={(e) => setCurrentTheme(prev => ({ ...prev, options: { ...prev.options, sidebarStyle: e.target.value as any } }))}
+                  onChange={(e) => setCurrentTheme(prev => ({ ...prev, options: { ...prev.options, sidebarStyle: e.target.value as 'light' | 'dark' | 'glass' } }))}
                   className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-forest"
                 >
                   <option value="light">Light</option>
@@ -4184,6 +4335,18 @@ const Admin = () => {
                   ))}
                 </tbody>
               </table>
+              {hasMoreProducts && (
+                <div className="p-4 border-t border-black/5 flex justify-center">
+                  <button 
+                    onClick={() => fetchAdminProducts()}
+                    disabled={isLoadingProducts}
+                    className="text-xs font-bold text-forest hover:underline flex items-center gap-2"
+                  >
+                    {isLoadingProducts ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
+                    Load More Products
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -5258,11 +5421,11 @@ export default function App() {
     if (currentTheme) {
       const root = document.documentElement;
       root.style.setProperty('--primary', currentTheme.primaryColor);
-      root.style.setProperty('--secondary', currentTheme.secondaryColor);
-      root.style.setProperty('--accent', currentTheme.accentColor);
+      root.style.setProperty('--secondary', currentTheme.accentColor);
+      root.style.setProperty('--accent', currentTheme.secondaryColor);
       root.style.setProperty('--bg', currentTheme.backgroundColor);
       root.style.setProperty('--text', currentTheme.textColor);
-      root.style.setProperty('--font-serif', currentTheme.fontFamily);
+      root.style.setProperty('--font-serif-family', currentTheme.fontFamily);
       root.style.setProperty('--radius', currentTheme.borderRadius);
       root.style.setProperty('--glass-opacity', currentTheme.glassOpacity);
     }

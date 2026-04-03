@@ -17,6 +17,7 @@ export interface ThemeSettings {
   fontFamily: string;
   borderRadius: string;
   glassOpacity: string;
+  sidebarStyle: 'light' | 'dark' | 'glass';
 }
 
 const DEFAULT_THEME: ThemeSettings = {
@@ -27,7 +28,8 @@ const DEFAULT_THEME: ThemeSettings = {
   textColor: '#1a1a1a',
   fontFamily: 'Cormorant Garamond',
   borderRadius: '32px',
-  glassOpacity: '0.15'
+  glassOpacity: '0.15',
+  sidebarStyle: 'light'
 };
 
 export const themeService = {
@@ -78,6 +80,7 @@ export const themeService = {
       - fontFamily (e.g., 'Inter', 'Cormorant Garamond', 'Montserrat', 'Playfair Display')
       - borderRadius (e.g., '8px', '16px', '32px', '9999px')
       - glassOpacity (e.g., '0.1', '0.2', '0.3')
+      - sidebarStyle ('light', 'dark', or 'glass')
       
       Return ONLY the JSON object.`,
       config: {
@@ -92,9 +95,10 @@ export const themeService = {
             textColor: { type: Type.STRING },
             fontFamily: { type: Type.STRING },
             borderRadius: { type: Type.STRING },
-            glassOpacity: { type: Type.STRING }
+            glassOpacity: { type: Type.STRING },
+            sidebarStyle: { type: Type.STRING, enum: ['light', 'dark', 'glass'] }
           },
-          required: ["primaryColor", "secondaryColor", "accentColor", "backgroundColor", "textColor", "fontFamily", "borderRadius", "glassOpacity"]
+          required: ["primaryColor", "secondaryColor", "accentColor", "backgroundColor", "textColor", "fontFamily", "borderRadius", "glassOpacity", "sidebarStyle"]
         }
       }
     });

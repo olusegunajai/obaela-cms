@@ -6,7 +6,13 @@ import {
   orderBy,
   doc,
   updateDoc,
-  deleteDoc
+  deleteDoc,
+  limit,
+  startAfter,
+  getDocs,
+  where,
+  QueryDocumentSnapshot,
+  QueryConstraint
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -44,6 +50,48 @@ export const productService = {
     }, (error) => {
       console.error("Error fetching products:", error);
     });
+  },
+
+  async getProducts(pageSize: number, lastVisibleDoc?: QueryDocumentSnapshot, category?: string, featuredOnly?: boolean) {
+    const constraints: QueryConstraint[] = [orderBy('createdAt', 'desc')];
+    
+    if (category && category !== 'All') {
+      constraints.push(where('category', '==', category));
+    }
+
+    if (featuredOnly) {
+      constraints.push(where('featured', '==', true));
+    }
+
+    if (lastVisibleDoc) {
+      constraints.push(startAfter(lastVisibleDoc));
+    }
+
+    constraints.push(limit(pageSize));
+
+    const q = query(collection(db, COLLECTION_NAME), ...constraints);
+    
+    const snapshot = await getDocs(q);
+    const products = snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    })) as Product[];
+    
+    return {
+      products,
+      lastVisible: snapshot.docs[snapshot.docs.length - 1]
+    };
+  },
+
+  async getAllCategories() {
+    const q = query(collection(db, COLLECTION_NAME));
+    const snapshot = await getDocs(q);
+    const categories = new Set<string>();
+    snapshot.docs.forEach(doc => {
+      const data = doc.data();
+      if (data.category) categories.add(data.category);
+    });
+    return Array.from(categories);
   },
 
   async updateProduct(id: string, data: Partial<Product>) {
