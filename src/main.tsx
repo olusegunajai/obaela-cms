@@ -8,6 +8,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { ToastProvider } from './components/Toast';
 import { ConfirmProvider } from './components/Confirm';
 import { CurrencyProvider } from './contexts/CurrencyContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -15,9 +16,11 @@ createRoot(document.getElementById('root')!).render(
       <ConfirmProvider>
         <ToastProvider>
           <CurrencyProvider>
-            <Router>
-              <App />
-            </Router>
+            <AuthProvider>
+              <Router>
+                <App />
+              </Router>
+            </AuthProvider>
           </CurrencyProvider>
         </ToastProvider>
       </ConfirmProvider>

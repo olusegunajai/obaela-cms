@@ -187,5 +187,50 @@ export const seedService = {
       }
       console.log('50 FAQs seeded.');
     }
+  },
+
+  async seedBabalawos() {
+    const ref = collection(db, 'babalawos');
+    const q = await getDocs(ref);
+    if (q.empty) {
+      const initial = [
+        { name: "Baba Ifagbemi", specialty: "Ifa Divination", bio: "Expert in sacred divination and spiritual alignment.", availability: "Mon-Fri", imageUrl: "https://picsum.photos/seed/baba1/400/400" },
+        { name: "Baba Ifakayode", specialty: "Herbal Medicine", bio: "Master herbalist with 30 years of experience.", availability: "Tue-Sat", imageUrl: "https://picsum.photos/seed/baba2/400/400" }
+      ];
+      for (const item of initial) {
+        await addDoc(ref, { ...item, createdAt: serverTimestamp() });
+      }
+      console.log('Babalawos seeded.');
+    }
+  },
+
+  async seedVideos() {
+    const ref = collection(db, 'videos');
+    const q = await getDocs(ref);
+    if (q.empty) {
+      const initial = [
+        { title: "Introduction to Ifa", description: "Learn the basics of Ifa philosophy.", youtubeId: "dQw4w9WgXcQ", requiredLevel: 0 },
+        { title: "Sacred Herbs of Yoruba", description: "A guide to traditional healing plants.", youtubeId: "dQw4w9WgXcQ", requiredLevel: 1 }
+      ];
+      for (const item of initial) {
+        await addDoc(ref, { ...item, createdAt: serverTimestamp() });
+      }
+      console.log('Videos seeded.');
+    }
+  },
+
+  async seedCourses() {
+    const ref = collection(db, 'courses');
+    const q = await getDocs(ref);
+    if (q.empty) {
+      const initial = [
+        { title: "Ifa Foundation", description: "The core principles of Ifa.", category: "General", price: 0, imageUrl: "https://picsum.photos/seed/course1/600/400" },
+        { title: "Herbal Mastery", description: "Advanced herbal medicine techniques.", category: "Medicine", price: 15000, imageUrl: "https://picsum.photos/seed/course2/600/400" }
+      ];
+      for (const item of initial) {
+        await addDoc(ref, { ...item, createdAt: serverTimestamp() });
+      }
+      console.log('Courses seeded.');
+    }
   }
 };

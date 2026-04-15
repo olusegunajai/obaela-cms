@@ -1,4 +1,3 @@
-import { db } from '../firebase';
 import { 
   doc, 
   getDoc, 
@@ -12,8 +11,15 @@ import {
   getDocFromServer,
   deleteDoc
 } from 'firebase/firestore';
-import { User as FirebaseUser } from 'firebase/auth';
-import { auth } from '../firebase';
+import { 
+  User as FirebaseUser, 
+  createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, 
+  sendPasswordResetEmail,
+  updateProfile,
+  signOut
+} from 'firebase/auth';
+import { auth, db } from '../firebase';
 
 export type UserRole = 'super-admin' | 'admin' | 'client';
 
@@ -170,5 +176,24 @@ export const authService = {
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, `users/${uid}`);
     }
+  },
+
+  async signUp(email: string, pass: string, name: string) {
+    const { user } = await createUserWithEmailAndPassword(auth, email, pass);
+    await updateProfile(user, { displayName: name });
+    return this.ensureUserProfile(user);
+  },
+
+  async login(email: string, pass: string) {
+    const { user } = await signInWithEmailAndPassword(auth, email, pass);
+    return this.ensureUserProfile(user);
+  },
+
+  async resetPassword(email: string) {
+    return sendPasswordResetEmail(auth, email);
+  },
+
+  async logout() {
+    return signOut(auth);
   }
 };

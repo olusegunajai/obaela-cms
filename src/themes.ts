@@ -8,6 +8,8 @@ export interface ThemeOptions {
   borderRadius: string;
   glassOpacity: string;
   sidebarStyle: 'light' | 'dark' | 'glass';
+  youtubeChannelId?: string;
+  youtubeApiKey?: string;
 }
 
 export interface Theme {

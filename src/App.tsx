@@ -21,18 +21,28 @@ import {
   Truck,
   Youtube,
   BarChart3,
-  LogOut
+  LogOut,
+  CheckCircle2,
+  CheckSquare,
+  Check,
+  PlayCircle,
+  Award,
+  Music,
+  Lock,
+  Clock,
+  Bell,
+  BellRing
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 import { Auth } from './components/Auth';
 import { consultationService, ConsultationType, Consultation as ConsultationData, ConsultationStatus } from './services/consultationService';
 import { auth, db } from './firebase';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, serverTimestamp, QueryDocumentSnapshot } from 'firebase/firestore';
 import { productService, Product } from './services/productService';
 import { uploadImage, uploadVideo } from './services/cloudinaryService';
-import { ShoppingCart, Plus, Trash2, Edit2, Upload, Loader2, Printer, MessageCircle, Send, X as CloseIcon, Play, Facebook, Instagram, Twitter, Star } from 'lucide-react';
+import { ShoppingCart, Plus, Trash2, Edit2, Upload, Loader2, Printer, MessageCircle, Send, X as CloseIcon, Play, Facebook, Instagram, Twitter, Star, Eye } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { orderService, OrderStatus, Order } from './services/orderService';
 import { courseService, Course, Lesson, Enrollment } from './services/courseService';
@@ -42,15 +52,18 @@ import { videoService, YouTubeVideo } from './services/videoService';
 import { staffService, StaffMember } from './services/staffService';
 import { seedService } from './services/seedService';
 import { pageService, Page } from './services/pageService';
+import { taskService, Task, TaskPriority, TaskStatus } from './services/taskService';
 import { themeService, ThemeSettings } from './services/themeService';
 import { themes, Theme } from './themes';
 import { reviewService, Review } from './services/reviewService';
 import { faqService, FAQ } from './services/faqService';
+import { notificationService, Notification } from './services/notificationService';
 import { useToast } from './components/Toast';
 import { useConfirm } from './components/Confirm';
 import { ProductReviews } from './components/ProductReviews';
 import { CONSULTATION_PRICE } from './constants';
 import { useCurrency } from './contexts/CurrencyContext';
+import { useAuth } from './contexts/AuthContext';
 import { formatCurrency, CURRENCIES, Currency } from './lib/currency';
 
 // Components
@@ -1181,8 +1194,10 @@ const Admin = () => {
   const { currency } = useCurrency();
   const { showToast } = useToast();
   const { showConfirm } = useConfirm();
-  const [activeTab, setActiveTab] = useState<'consultations' | 'products' | 'orders' | 'users' | 'courses' | 'babalawos' | 'videos' | 'staff' | 'accounting' | 'pages' | 'theme' | 'faqs' | 'media'>('consultations');
+  const { user, userProfile } = useAuth();
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'consultations' | 'products' | 'orders' | 'users' | 'courses' | 'babalawos' | 'videos' | 'staff' | 'accounting' | 'pages' | 'theme' | 'faqs' | 'media' | 'tasks'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [allConsultations, setAllConsultations] = useState<ConsultationData[]>([]);
   const [allOrders, setAllOrders] = useState<Order[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
@@ -1224,7 +1239,7 @@ const Admin = () => {
     u.email?.toLowerCase().includes(userSearch.toLowerCase())
   );
   const [courses, setCourses] = useState<Course[]>([]);
-  const [lessons] = useState<Lesson[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [babalawos, setBabalawos] = useState<Babalawo[]>([]);
   const [allVideos, setAllVideos] = useState<YouTubeVideo[]>([]);
   const [allStaff, setAllStaff] = useState<StaffMember[]>([]);
@@ -1238,8 +1253,6 @@ const Admin = () => {
     order: 1,
     isPublished: true
   });
-  const [user, setUser] = useState<FirebaseUser | null>(auth.currentUser);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editingCourse, setEditingCourse] = useState<Course | null>(null);
   const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
@@ -1292,8 +1305,34 @@ const Admin = () => {
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [selectedFaqs, setSelectedFaqs] = useState<string[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<string[]>([]);
+  const [selectedBabalawos, setSelectedBabalawos] = useState<string[]>([]);
+  const [selectedVideos, setSelectedVideos] = useState<string[]>([]);
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [selectedCourses, setSelectedCourses] = useState<string[]>([]);
   const [selectedStaffDepartment, setSelectedStaffDepartment] = useState('All');
   const [selectedStaffStatus, setSelectedStaffStatus] = useState('All');
+
+  // Search and Pagination States
+  const [consultationSearch, setConsultationSearch] = useState('');
+  const [orderSearch, setOrderSearch] = useState('');
+  const [faqSearch, setFaqSearch] = useState('');
+  const [babalawoSearch, setBabalawoSearch] = useState('');
+  const [videoSearch, setVideoSearch] = useState('');
+  const [courseSearch, setCourseSearch] = useState('');
+  const [productSearch, setProductSearch] = useState('');
+
+  const [consultationPage, setConsultationPage] = useState(1);
+  const [orderPage, setOrderPage] = useState(1);
+  const [faqPage, setFaqPage] = useState(1);
+  const [staffPage, setStaffPage] = useState(1);
+  const [userPage, setUserPage] = useState(1);
+  const [coursePage, setCoursePage] = useState(1);
+  const [babalawoPage, setBabalawoPage] = useState(1);
+  const [videoPage, setVideoPage] = useState(1);
+  const [taskPage, setTaskPage] = useState(1);
+  const [pagePage, setPagePage] = useState(1);
+  
+  const ITEMS_PER_PAGE = 10;
 
   const handleBulkDeleteConsultations = async () => {
     showConfirm("Bulk Delete", `Are you sure you want to delete ${selectedConsultations.length} consultations?`, async () => {
@@ -1358,6 +1397,28 @@ const Admin = () => {
 
   const [selectedUserForPermissions, setSelectedUserForPermissions] = useState<UserProfile | null>(null);
   const [isVisualEditor, setIsVisualEditor] = useState(false);
+  const [isPageModalOpen, setIsPageModalOpen] = useState(false);
+  const [isProductModalOpen, setIsProductModalOpen] = useState(false);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [isMediaModalOpen, setIsMediaModalOpen] = useState(false);
+  const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState<{url: string, type: 'image' | 'video', name: string} | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
+  const [taskForm, setTaskForm] = useState<Partial<Task>>({
+    title: '',
+    description: '',
+    priority: TaskPriority.MEDIUM,
+    status: TaskStatus.TODO,
+    dueDate: new Date().toISOString().split('T')[0]
+  });
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [taskFilter, setTaskFilter] = useState({
+    status: 'All',
+    priority: 'All',
+    search: ''
+  });
+  const [selectedPages, setSelectedPages] = useState<string[]>([]);
   const [mediaFiles, setMediaFiles] = useState<{url: string, type: 'image' | 'video', name: string}[]>([]);
   const [pageForm, setPageForm] = useState<Partial<Page>>({
     title: '',
@@ -1427,6 +1488,58 @@ const Admin = () => {
     });
   };
 
+  const handleBulkDeleteBabalawos = async () => {
+    showConfirm("Bulk Delete", `Are you sure you want to delete ${selectedBabalawos.length} babaláwos?`, async () => {
+      try {
+        await Promise.all(selectedBabalawos.map(id => babalawoService.deleteBabalawo(id)));
+        setSelectedBabalawos([]);
+        showToast("Babaláwos deleted successfully", "success");
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to delete babaláwos", "error");
+      }
+    });
+  };
+
+  const handleBulkDeleteVideos = async () => {
+    showConfirm("Bulk Delete", `Are you sure you want to delete ${selectedVideos.length} videos?`, async () => {
+      try {
+        await Promise.all(selectedVideos.map(id => videoService.deleteVideo(id)));
+        setSelectedVideos([]);
+        showToast("Videos deleted successfully", "success");
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to delete videos", "error");
+      }
+    });
+  };
+
+  const handleBulkDeleteUsers = async () => {
+    showConfirm("Bulk Delete", `Are you sure you want to delete ${selectedUsers.length} users?`, async () => {
+      try {
+        await Promise.all(selectedUsers.map(id => authService.deleteUserProfile(id)));
+        setSelectedUsers([]);
+        showToast("Users deleted successfully", "success");
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to delete users", "error");
+      }
+    });
+  };
+
+  const handleBulkDeleteCourses = async () => {
+    showConfirm("Bulk Delete", `Are you sure you want to delete ${selectedCourses.length} courses?`, async () => {
+      try {
+        await Promise.all(selectedCourses.map(id => courseService.deleteCourse(id)));
+        setSelectedCourses([]);
+        showToast("Courses deleted successfully", "success");
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to delete courses", "error");
+      }
+    });
+  };
+
   // Product Form State
   const [productForm, setProductForm] = useState({
     name: '',
@@ -1489,18 +1602,6 @@ const Admin = () => {
   const [isGeneratingTheme, setIsGeneratingTheme] = useState(false);
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, async (u) => {
-      setUser(u);
-      if (u) {
-        const profile = await authService.getUserProfile(u.uid);
-        setUserProfile(profile);
-      }
-    });
-
-    return unsubscribeAuth;
-  }, []);
-
-  useEffect(() => {
     if (editingCourse) {
       setCourseForm({
         title: editingCourse.title,
@@ -1543,8 +1644,12 @@ const Admin = () => {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = faqService.subscribeToFAQs(setFaqs);
-    return unsubscribe;
+    const unsubscribeFaqs = faqService.subscribeToFAQs(setFaqs);
+    const unsubscribeTasks = taskService.subscribeToTasks(setTasks);
+    return () => {
+      unsubscribeFaqs();
+      unsubscribeTasks();
+    };
   }, []);
 
   useEffect(() => {
@@ -1573,6 +1678,150 @@ const Admin = () => {
         }
       }
     );
+  };
+
+  const handleSavePage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingPage) {
+        await pageService.updatePage(editingPage.id!, pageForm);
+        showToast("Page updated successfully", "success");
+      } else {
+        await pageService.createPage(pageForm as Page);
+        showToast("Page created successfully", "success");
+      }
+      setIsPageModalOpen(false);
+      setEditingPage(null);
+      setPageForm({ title: '', slug: '', content: '', isPublished: false });
+    } catch (error) {
+      console.error(error);
+      showToast("Failed to save page", "error");
+    }
+  };
+
+  const handleBulkDeletePages = async () => {
+    showConfirm("Bulk Delete", `Are you sure you want to delete ${selectedPages.length} pages?`, async () => {
+      try {
+        await Promise.all(selectedPages.map(id => pageService.deletePage(id)));
+        setSelectedPages([]);
+        showToast("Pages deleted successfully", "success");
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to delete pages", "error");
+      }
+    });
+  };
+
+  const handleSaveTask = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (editingTask?.id) {
+        await taskService.updateTask(editingTask.id, taskForm);
+        showToast("Task updated successfully", "success");
+      } else {
+        await taskService.createTask(taskForm as Task);
+        showToast("Task created successfully", "success");
+      }
+      setIsTaskModalOpen(false);
+      setEditingTask(null);
+      setTaskForm({
+        title: '',
+        description: '',
+        priority: TaskPriority.MEDIUM,
+        status: TaskStatus.TODO,
+        dueDate: new Date().toISOString().split('T')[0]
+      });
+    } catch (error) {
+      console.error(error);
+      showToast("Error saving task", "error");
+    }
+  };
+
+  const handleBulkDeleteTasks = async () => {
+    if (selectedTasks.length === 0) return;
+    showConfirm(
+      "Bulk Delete Tasks",
+      `Are you sure you want to delete ${selectedTasks.length} tasks?`,
+      async () => {
+        try {
+          await Promise.all(selectedTasks.map(id => taskService.deleteTask(id)));
+          showToast(`Deleted ${selectedTasks.length} tasks`, "success");
+          setSelectedTasks([]);
+        } catch (error) {
+          console.error(error);
+          showToast("Error deleting tasks", "error");
+        }
+      }
+    );
+  };
+
+  const syncYouTubeVideos = async () => {
+    const { youtubeChannelId, youtubeApiKey } = currentTheme.options;
+    if (!youtubeChannelId || !youtubeApiKey) {
+      showToast("YouTube Channel ID and API Key are required for sync.", "error");
+      return;
+    }
+
+    try {
+      showToast("Syncing videos from YouTube...", "info");
+      const response = await fetch(
+        `https://www.googleapis.com/youtube/v3/search?key=${youtubeApiKey}&channelId=${youtubeChannelId}&part=snippet,id&order=date&maxResults=50&type=video`
+      );
+      const data = await response.json();
+
+      if (data.error) {
+        throw new Error(data.error.message);
+      }
+
+      const youtubeVideos = data.items.map((item: {
+        snippet: {
+          title: string;
+          description: string;
+          thumbnails: {
+            high: {
+              url: string;
+            };
+          };
+        };
+        id: {
+          videoId: string;
+        };
+      }) => ({
+        title: item.snippet.title,
+        description: item.snippet.description,
+        youtubeId: item.id.videoId,
+        thumbnailUrl: item.snippet.thumbnails.high.url,
+        requiredLevel: 0
+      }));
+
+      // Save to Firestore (avoid duplicates by checking youtubeId)
+      let addedCount = 0;
+      for (const video of youtubeVideos) {
+        const exists = allVideos.some(v => v.youtubeId === video.youtubeId);
+        if (!exists) {
+          await videoService.addVideo(video);
+          addedCount++;
+        }
+      }
+
+      showToast(`Sync complete! Added ${addedCount} new videos.`, "success");
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof Error ? error.message : "Failed to sync YouTube videos";
+      showToast(message, "error");
+    }
+  };
+
+  const handleBulkUpdateTaskStatus = async (status: TaskStatus) => {
+    if (selectedTasks.length === 0) return;
+    try {
+      await Promise.all(selectedTasks.map(id => taskService.updateTask(id, { status })));
+      showToast(`Updated ${selectedTasks.length} tasks to ${status}`, "success");
+      setSelectedTasks([]);
+    } catch (error) {
+      console.error(error);
+      showToast("Error updating tasks", "error");
+    }
   };
 
   const handleGenerateTheme = async () => {
@@ -1719,6 +1968,8 @@ const Admin = () => {
       const unsubscribeBabalawos = babalawoService.subscribeToBabalawos(setBabalawos);
       const unsubscribeVideos = videoService.subscribeToVideos(setAllVideos);
       const unsubscribeStaff = staffService.subscribeToStaff(setAllStaff);
+      const unsubscribePages = pageService.subscribeToPages(setPages);
+      const unsubscribeFaqs = faqService.subscribeToFAQs(setFaqs);
       
       if (userProfile.role === 'super-admin') {
         unsubscribeUsers = authService.subscribeToAllUsers(setAllUsers);
@@ -1732,9 +1983,18 @@ const Admin = () => {
         unsubscribeBabalawos();
         unsubscribeVideos();
         unsubscribeStaff();
+        unsubscribePages();
+        unsubscribeFaqs();
       };
     }
   }, [userProfile]);
+
+  useEffect(() => {
+    if (selectedCourseForLessons?.id) {
+      const unsubscribe = courseService.subscribeToLessons(selectedCourseForLessons.id, setLessons);
+      return unsubscribe;
+    }
+  }, [selectedCourseForLessons]);
 
   const handleUpdateUser = async (uid: string, data: Partial<UserProfile>) => {
     try {
@@ -1787,11 +2047,11 @@ const Admin = () => {
     e.preventDefault();
     try {
       if (editingBabalawo?.id) {
-        await healerService.updateHealer(editingBabalawo.id, babalawoForm);
+        await babalawoService.updateBabalawo(editingBabalawo.id, babalawoForm);
         showToast("Babaláwo updated successfully", "success");
         setEditingBabalawo(null);
       } else {
-        await healerService.createHealer(babalawoForm);
+        await babalawoService.createBabalawo(babalawoForm);
         showToast("Babaláwo added successfully", "success");
       }
       setBabalawoForm({ name: '', specialty: '', bio: '', availability: '', imageUrl: '' });
@@ -1875,7 +2135,7 @@ const Admin = () => {
       "Are you sure you want to delete this babaláwo?",
       async () => {
         try {
-          await healerService.deleteHealer(id);
+          await babalawoService.deleteBabalawo(id);
           showToast("Babaláwo deleted successfully", "success");
         } catch (error) {
           console.error(error);
@@ -1986,55 +2246,103 @@ const Admin = () => {
   };
 
   const menuItems = [
-    { id: 'consultations', label: 'Consultations', icon: Calendar },
-    { id: 'products', label: 'Products', icon: ShoppingBag },
-    { id: 'orders', label: 'Orders', icon: Truck },
-    { id: 'courses', label: 'Ilé-Àkọ́ni-lọ́gbọ́n', icon: BookOpen },
-    { id: 'babalawos', label: 'Babaláwos', icon: User },
-    { id: 'videos', label: 'Videos', icon: Youtube },
-    { id: 'staff', label: 'Staff', icon: Users },
-    { id: 'faqs', label: 'FAQs', icon: MessageCircle },
-    { id: 'media', label: 'Media Manager', icon: Upload },
-    { id: 'accounting', label: 'Accounting', icon: CreditCard },
-    { id: 'pages', label: 'Pages', icon: FileText },
-    { id: 'theme', label: 'Theme AI', icon: Sparkles },
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'super-admin'] },
+    { id: 'consultations', label: 'Consultations', icon: Calendar, roles: ['admin', 'super-admin'] },
+    { id: 'products', label: 'Products', icon: ShoppingBag, roles: ['admin', 'super-admin'] },
+    { id: 'orders', label: 'Orders', icon: Truck, roles: ['admin', 'super-admin'] },
+    { id: 'courses', label: 'Ilé-Àkọ́ni-lọ́gbọ́n', icon: BookOpen, roles: ['admin', 'super-admin'] },
+    { id: 'babalawos', label: 'Babaláwos', icon: User, roles: ['admin', 'super-admin'] },
+    { id: 'videos', label: 'Videos', icon: Youtube, roles: ['admin', 'super-admin'] },
+    { id: 'staff', label: 'Staff', icon: Users, roles: ['admin', 'super-admin'] },
+    { id: 'faqs', label: 'FAQs', icon: MessageCircle, roles: ['admin', 'super-admin'] },
+    { id: 'media', label: 'Media Manager', icon: Upload, roles: ['admin', 'super-admin'] },
+    { id: 'accounting', label: 'Accounting', icon: CreditCard, roles: ['super-admin'] },
+    { id: 'tasks', label: 'Tasks', icon: CheckSquare, roles: ['admin', 'super-admin'] },
+    { id: 'pages', label: 'Pages', icon: FileText, roles: ['super-admin'] },
+    { id: 'theme', label: 'Theme AI', icon: Sparkles, roles: ['super-admin'] },
+    { id: 'users', label: 'Users', icon: Shield, roles: ['super-admin'] },
   ];
 
-  const filteredMenuItems = userProfile?.role === 'super-admin'
-    ? [...menuItems, { id: 'users', label: 'Users', icon: Shield }]
-    : menuItems.filter(item => userProfile?.permissions?.menuAccess?.includes(item.id));
+  const filteredMenuItems = menuItems.filter(item => {
+    // Super admin sees everything
+    if (userProfile?.role === 'super-admin') return true;
+    
+    // If granular permissions are set, they take precedence for admins
+    if (userProfile?.role === 'admin' && userProfile?.permissions?.menuAccess) {
+      return userProfile.permissions.menuAccess.includes(item.id);
+    }
+    
+    // Otherwise fallback to role-based access
+    return item.roles.includes(userProfile?.role || 'client');
+  });
 
   if (userProfile?.role !== 'admin' && userProfile?.role !== 'super-admin') {
     return <div className="p-12 text-center text-red-500 font-bold">Access Denied. Admin only.</div>;
   }
 
   return (
-    <div className="flex min-h-[calc(100vh-80px)] bg-gray-50/50">
+    <div className="flex min-h-[calc(100vh-80px)] bg-gray-50/50 relative">
+      {/* Mobile Sidebar Overlay */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          />
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
       <aside 
         className={`${
           isSidebarOpen ? 'w-64' : 'w-20'
-        } bg-white border-r border-black/5 transition-all duration-300 flex flex-col sticky top-20 h-[calc(100vh-80px)] z-30`}
+        } bg-white border-r border-black/5 transition-all duration-300 flex flex-col fixed lg:sticky top-0 lg:top-20 h-screen lg:h-[calc(100vh-80px)] z-50 lg:z-30 ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
       >
-        <div className="p-4 flex justify-between items-center border-b border-black/5">
-          {isSidebarOpen && <span className="font-bold text-xs uppercase tracking-widest text-forest/50">Management</span>}
+        <div className="absolute inset-0 opacity-[0.02] pointer-events-none bg-[radial-gradient(#000_1px,transparent_1px)] [background-size:16px_16px]" />
+        
+        <div className="p-4 flex justify-between items-center border-b border-black/5 relative z-10">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-forest rounded-lg flex items-center justify-center lg:hidden">
+              <Leaf className="text-white" size={18} />
+            </div>
+            {isSidebarOpen && (
+              <div className="flex flex-col">
+                <span className="font-bold text-[10px] uppercase tracking-[0.2em] text-forest">Management</span>
+                <span className="text-[9px] text-gray-400 font-medium">Control Center</span>
+              </div>
+            )}
+          </div>
           <button 
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-forest"
+            className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-forest hidden lg:block"
           >
             <BarChart3 size={20} className={isSidebarOpen ? '' : 'rotate-90'} />
           </button>
+          <button 
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-forest lg:hidden"
+          >
+            <X size={20} />
+          </button>
         </div>
 
-        <nav className="flex-grow p-4 space-y-2 overflow-y-auto">
+        <nav className="flex-grow p-4 space-y-1.5 overflow-y-auto relative z-10 custom-scrollbar">
           {filteredMenuItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeTab === item.id;
             return (
               <button
                 key={item.id}
-                onClick={() => setActiveTab(item.id as typeof activeTab)}
-                className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all group ${
+                onClick={() => {
+                  setActiveTab(item.id as typeof activeTab);
+                  if (window.innerWidth < 1024) setIsMobileMenuOpen(false);
+                }}
+                className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all group relative ${
                   isActive 
                     ? 'bg-forest text-white shadow-lg shadow-forest/20' 
                     : 'hover:bg-forest/5 text-gray-500 hover:text-forest'
@@ -2049,15 +2357,29 @@ const Admin = () => {
                     className="ml-auto w-1.5 h-1.5 rounded-full bg-white"
                   />
                 )}
+                {!isSidebarOpen && isActive && (
+                  <div className="absolute left-0 w-1 h-6 bg-forest rounded-r-full" />
+                )}
               </button>
             );
           })}
         </nav>
 
-        <div className="p-4 border-t border-black/5">
+        <div className="p-4 border-t border-black/5 relative z-10">
+          <div className={`flex items-center gap-3 p-2 mb-4 rounded-2xl bg-gray-50 border border-black/5 ${!isSidebarOpen ? 'justify-center' : ''}`}>
+            <div className="w-8 h-8 rounded-full bg-forest/10 flex items-center justify-center text-forest shrink-0">
+              <User size={16} />
+            </div>
+            {isSidebarOpen && (
+              <div className="overflow-hidden">
+                <p className="text-xs font-bold truncate">{userProfile?.displayName || 'Admin'}</p>
+                <p className="text-[10px] text-gray-400 truncate uppercase tracking-wider">{userProfile?.role}</p>
+              </div>
+            )}
+          </div>
           <button 
             onClick={() => navigate('/')}
-            className="w-full flex items-center gap-3 p-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-bold text-sm"
+            className={`w-full flex items-center gap-3 p-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-bold text-sm ${!isSidebarOpen ? 'justify-center' : ''}`}
           >
             <LogOut size={20} />
             {isSidebarOpen && <span>Exit Admin</span>}
@@ -2066,55 +2388,623 @@ const Admin = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-grow p-8 overflow-y-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h2 className="text-3xl font-bold serif">{menuItems.find(m => m.id === activeTab)?.label}</h2>
-            <p className="text-sm text-gray-500 mt-1">Manage your {menuItems.find(m => m.id === activeTab)?.label.toLowerCase()} and system settings</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <div className="bg-white px-4 py-2 rounded-2xl border border-black/5 shadow-sm flex items-center gap-3">
-              <div className="w-8 h-8 bg-forest/10 rounded-full flex items-center justify-center">
-                <Shield size={16} className="text-forest" />
+      <div className="flex-grow min-w-0">
+        {/* Sticky Header */}
+        <header className="sticky top-0 lg:top-20 z-20 bg-gray-50/80 backdrop-blur-md border-b border-black/5 px-4 lg:px-8 py-4">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <button 
+                onClick={() => setIsMobileMenuOpen(true)}
+                className="p-2.5 bg-white border border-black/5 rounded-xl text-forest lg:hidden shadow-sm hover:bg-gray-50 transition-colors"
+              >
+                <Menu size={20} />
+              </button>
+              <div>
+                <h2 className="text-xl lg:text-2xl font-bold serif flex items-center gap-2">
+                  {menuItems.find(m => m.id === activeTab)?.label}
+                  <span className="text-[10px] font-bold bg-forest/10 text-forest px-2 py-0.5 rounded-full uppercase tracking-widest hidden sm:inline-block">Live</span>
+                </h2>
+                <p className="text-[10px] lg:text-xs text-gray-500 font-medium">System / {menuItems.find(m => m.id === activeTab)?.label}</p>
               </div>
-              <div className="text-left">
-                <div className="text-[10px] uppercase tracking-widest font-bold opacity-40">Access Level</div>
-                <div className="text-xs font-bold text-forest uppercase">{userProfile?.role}</div>
+            </div>
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="hidden sm:flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-black/5 shadow-sm">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">System Online</span>
+              </div>
+              <div className="bg-white px-4 py-2 rounded-xl border border-black/5 shadow-sm flex items-center gap-3 shrink-0 ml-auto md:ml-0">
+                <div className="w-7 h-7 bg-forest/10 rounded-lg flex items-center justify-center">
+                  <Shield size={14} className="text-forest" />
+                </div>
+                <div className="text-left">
+                  <div className="text-[9px] uppercase tracking-widest font-bold opacity-40 leading-none mb-0.5">Role</div>
+                  <div className="text-[10px] font-bold text-forest uppercase leading-none">{userProfile?.role}</div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-      
-      {activeTab === 'consultations' ? (
+        </header>
+
+        <main className="p-4 lg:p-8">
+          {!filteredMenuItems.some(m => m.id === activeTab) ? (
+            <div className="flex flex-col items-center justify-center py-24 text-center">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center text-red-500 mb-6">
+                <Lock size={40} />
+              </div>
+              <h3 className="text-2xl font-bold serif mb-2">Access Restricted</h3>
+              <p className="text-gray-500 max-w-md mx-auto">
+                You do not have the necessary permissions to access the <span className="font-bold text-black">{menuItems.find(m => m.id === activeTab)?.label}</span> section. 
+                Please contact a super-admin if you believe this is an error.
+              </p>
+              <button 
+                onClick={() => setActiveTab('dashboard')}
+                className="mt-8 px-8 py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all"
+              >
+                Return to Dashboard
+              </button>
+            </div>
+          ) : activeTab === 'dashboard' ? (
+            <div className="space-y-8">
+              {/* Welcome Banner */}
+              <div className="relative bg-forest text-white p-8 lg:p-12 rounded-[2rem] shadow-xl shadow-forest/20 overflow-hidden group">
+                <div className="absolute inset-0 opacity-10 pointer-events-none bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:24px_24px] group-hover:scale-110 transition-transform duration-700" />
+                <div className="relative z-10 max-w-2xl">
+                  <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest mb-6 border border-white/10">
+                    <Sparkles size={12} />
+                    System Overview
+                  </div>
+                  <h3 className="text-3xl lg:text-5xl font-bold serif mb-4 leading-tight">Welcome back,<br />{userProfile?.displayName || 'Admin'}</h3>
+                  <p className="text-white/80 text-sm lg:text-base max-w-md leading-relaxed">
+                    Manage your spiritual sanctuary's operations, products, and community from this central command center. Everything is running smoothly.
+                  </p>
+                  <div className="flex flex-wrap gap-4 mt-8">
+                    <button onClick={() => setActiveTab('consultations')} className="bg-white text-forest px-6 py-3 rounded-xl font-bold text-sm hover:scale-105 transition-all shadow-lg">
+                      View Schedule
+                    </button>
+                    <button onClick={() => setActiveTab('orders')} className="bg-forest-light/20 backdrop-blur-md text-white border border-white/20 px-6 py-3 rounded-xl font-bold text-sm hover:bg-white/10 transition-all">
+                      Check Orders
+                    </button>
+                  </div>
+                </div>
+                <div className="absolute right-[-40px] bottom-[-40px] text-white/5 group-hover:text-white/10 transition-colors duration-700">
+                  <Leaf size={320} className="rotate-12" />
+                </div>
+              </div>
+
+              {/* Stats Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                {[
+                  { label: 'Total Products', value: products.length, icon: ShoppingBag, color: 'forest', tab: 'products' },
+                  { label: 'Consultations', value: allConsultations.length, icon: Calendar, color: 'gold', tab: 'consultations' },
+                  { label: 'Active Orders', value: allOrders.filter(o => o.status === 'pending').length, icon: Truck, color: 'blue', tab: 'orders' },
+                  { label: 'Total Revenue', value: formatCurrency(allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0), currency), icon: CreditCard, color: 'green', tab: 'accounting' }
+                ].map((stat, i) => (
+                  <div key={i} className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all group">
+                    <div className="flex justify-between items-start mb-4">
+                      <div className={`w-12 h-12 bg-${stat.color === 'forest' ? 'forest' : stat.color === 'gold' ? 'gold' : stat.color === 'blue' ? 'blue-500' : 'green-500'}/10 rounded-2xl flex items-center justify-center text-${stat.color === 'forest' ? 'forest' : stat.color === 'gold' ? 'gold' : stat.color === 'blue' ? 'blue-500' : 'green-500'}`}>
+                        <stat.icon size={24} className="group-hover:scale-110 transition-transform" />
+                      </div>
+                      <button onClick={() => setActiveTab(stat.tab as 'dashboard' | 'consultations' | 'products' | 'orders' | 'users' | 'courses' | 'babalawos' | 'videos' | 'staff' | 'accounting' | 'pages' | 'theme' | 'faqs' | 'media')} className="text-[10px] font-bold text-gray-400 hover:text-forest uppercase tracking-widest transition-colors">View</button>
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-bold opacity-40 uppercase tracking-widest mb-1">{stat.label}</div>
+                      <div className="text-2xl font-bold">{stat.value}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Recent Activity & Quick Actions */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                <div className="lg:col-span-2 bg-white p-8 rounded-[2rem] border border-black/5 shadow-sm">
+                  <div className="flex justify-between items-center mb-8">
+                    <h4 className="text-xl font-bold serif">Recent Activity</h4>
+                    <button className="text-xs font-bold text-forest hover:underline">View All</button>
+                  </div>
+                  <div className="space-y-6">
+                    {[...allOrders, ...allConsultations]
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                      .slice(0, 5)
+                      .map((activity, i) => (
+                        <div key={i} className="flex items-center gap-4 group">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${'items' in activity ? 'bg-blue-50 text-blue-600' : 'bg-gold/10 text-gold'}`}>
+                            {'items' in activity ? <ShoppingBag size={18} /> : <Calendar size={18} />}
+                          </div>
+                          <div className="flex-grow min-w-0">
+                            <p className="text-sm font-bold truncate">
+                              {'items' in activity ? `New order from ${activity.customerName}` : `Consultation with ${activity.name}`}
+                            </p>
+                            <p className="text-xs text-gray-400">{new Date(activity.createdAt).toLocaleDateString()} at {new Date(activity.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                          </div>
+                          <div className="text-right shrink-0">
+                            <p className="text-sm font-bold">{'items' in activity ? formatCurrency(activity.totalAmount, currency) : 'Booked'}</p>
+                            <p className={`text-[10px] font-bold uppercase tracking-widest ${activity.status === 'completed' || activity.status === 'paid' ? 'text-green-500' : 'text-gold'}`}>
+                              {activity.status}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="bg-white p-8 rounded-[2rem] border border-black/5 shadow-sm">
+                    <h4 className="text-xl font-bold serif mb-6">Broadcast Update</h4>
+                    <div className="space-y-4">
+                      <input 
+                        type="text" 
+                        placeholder="Update Title" 
+                        className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest text-sm"
+                        id="broadcast-title"
+                      />
+                      <textarea 
+                        placeholder="Update Message" 
+                        className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest text-sm"
+                        rows={3}
+                        id="broadcast-message"
+                      />
+                      <button 
+                        onClick={async () => {
+                          const title = (document.getElementById('broadcast-title') as HTMLInputElement).value;
+                          const message = (document.getElementById('broadcast-message') as HTMLTextAreaElement).value;
+                          if (!title || !message) {
+                            showToast("Please fill all fields", "error");
+                            return;
+                          }
+                          try {
+                            await notificationService.sendToAllUsers({
+                              type: 'update',
+                              title,
+                              message,
+                              link: '/'
+                            });
+                            showToast("Broadcast sent successfully!", "success");
+                            (document.getElementById('broadcast-title') as HTMLInputElement).value = '';
+                            (document.getElementById('broadcast-message') as HTMLTextAreaElement).value = '';
+                          } catch (error) {
+                            console.error(error);
+                            showToast("Failed to send broadcast", "error");
+                          }
+                        }}
+                        className="w-full py-3 bg-forest text-white rounded-xl font-bold text-sm hover:bg-opacity-90 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Bell size={16} />
+                        Send Broadcast
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-white p-8 rounded-[2rem] border border-black/5 shadow-sm">
+                    <h4 className="text-xl font-bold serif mb-6">Quick Actions</h4>
+                    <div className="grid grid-cols-2 gap-4">
+                      {[
+                        { label: 'Add Product', icon: Plus, tab: 'products', action: () => { setEditingProduct(null); setProductForm({ name: '', description: '', price: 0, category: '', images: [], stock: 0, isActive: true, requiredLevel: 0 }); setIsProductModalOpen(true); } },
+                        { label: 'New Task', icon: CheckSquare, tab: 'tasks', action: () => { setEditingTask(null); setTaskForm({ title: '', description: '', status: 'pending', priority: 'medium', dueDate: '' }); setIsTaskModalOpen(true); } },
+                        { label: 'Media', icon: Upload, tab: 'media' },
+                        { label: 'Settings', icon: Shield, tab: 'theme' }
+                      ].map((action, i) => (
+                        <button 
+                          key={i}
+                          onClick={() => {
+                            setActiveTab(action.tab as 'dashboard' | 'consultations' | 'products' | 'orders' | 'users' | 'courses' | 'babalawos' | 'videos' | 'staff' | 'accounting' | 'pages' | 'theme' | 'faqs' | 'media');
+                            if (action.action) action.action();
+                          }}
+                          className="flex flex-col items-center justify-center p-4 rounded-2xl bg-gray-50 hover:bg-forest hover:text-white transition-all group border border-black/5"
+                        >
+                          <action.icon size={20} className="mb-2 group-hover:scale-110 transition-transform" />
+                          <span className="text-[10px] font-bold uppercase tracking-widest">{action.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="bg-gold text-white p-8 rounded-[2rem] shadow-xl shadow-gold/20 relative overflow-hidden">
+                    <div className="relative z-10">
+                      <h4 className="text-xl font-bold serif mb-2">Need Help?</h4>
+                      <p className="text-sm opacity-80 mb-4">Check our documentation or contact support for assistance.</p>
+                      <button className="w-full py-3 rounded-xl bg-white text-gold font-bold text-sm hover:scale-105 transition-all">
+                        Support Center
+                      </button>
+                    </div>
+                    <Sparkles className="absolute right-[-20px] bottom-[-20px] text-white/10 w-32 h-32" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'consultations' ? (
         <div className="grid grid-cols-1 gap-8">
           <section>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <Calendar className="text-forest" />
                 Recent Consultations
               </h3>
-              {selectedConsultations.length > 0 && (
-                <div className="flex items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 animate-in fade-in slide-in-from-top-2">
-                  <span className="text-sm font-bold text-forest">{selectedConsultations.length} Selected</span>
-                  <div className="h-4 w-[1px] bg-forest/20" />
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search consultations..." 
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-white"
+                    value={consultationSearch}
+                    onChange={(e) => {
+                      setConsultationSearch(e.target.value);
+                      setConsultationPage(1);
+                    }}
+                  />
+                </div>
+                {selectedConsultations.length > 0 && (
+                  <div className="flex items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 animate-in fade-in slide-in-from-top-2">
+                    <span className="text-sm font-bold text-forest">{selectedConsultations.length} Selected</span>
+                    <div className="h-4 w-[1px] bg-forest/20" />
+                    <select 
+                      onChange={(e) => handleBulkUpdateConsultationStatus(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-forest outline-none cursor-pointer"
+                      value=""
+                    >
+                      <option value="" disabled>Update Status</option>
+                      {Object.values(ConsultationStatus).map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                    <button 
+                      onClick={handleBulkDeleteConsultations}
+                      className="text-xs font-bold text-red-500 hover:text-red-600 flex items-center gap-1"
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
+                    <button 
+                      onClick={() => setSelectedConsultations([])}
+                      className="text-xs font-bold opacity-40 hover:opacity-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-gray-50 z-10">
+                    <tr className="border-b border-black/5">
+                      <th className="p-4 w-10">
+                        <input 
+                          type="checkbox" 
+                          className="rounded border-gray-300 text-forest focus:ring-forest"
+                          checked={selectedConsultations.length === allConsultations.length && allConsultations.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedConsultations(allConsultations.map(c => c.id!));
+                            else setSelectedConsultations([]);
+                          }}
+                        />
+                      </th>
+                      <th className="p-4 text-sm font-bold">Client</th>
+                      <th className="p-4 text-sm font-bold">Type</th>
+                      <th className="p-4 text-sm font-bold">Scheduled At</th>
+                      <th className="p-4 text-sm font-bold">Status</th>
+                      <th className="p-4 text-sm font-bold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-black/5">
+                    {allConsultations
+                      .filter(c => 
+                        c.clientUid.toLowerCase().includes(consultationSearch.toLowerCase()) ||
+                        c.type.toLowerCase().includes(consultationSearch.toLowerCase()) ||
+                        c.status.toLowerCase().includes(consultationSearch.toLowerCase())
+                      )
+                      .slice((consultationPage - 1) * ITEMS_PER_PAGE, consultationPage * ITEMS_PER_PAGE)
+                      .map((c) => (
+                        <tr key={c.id} className={`hover:bg-gray-50 transition-colors ${selectedConsultations.includes(c.id!) ? 'bg-forest/5' : ''}`}>
+                          <td className="p-4">
+                            <input 
+                              type="checkbox" 
+                              className="rounded border-gray-300 text-forest focus:ring-forest"
+                              checked={selectedConsultations.includes(c.id!)}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedConsultations([...selectedConsultations, c.id!]);
+                                else setSelectedConsultations(selectedConsultations.filter(id => id !== c.id));
+                              }}
+                            />
+                          </td>
+                          <td className="p-4 text-sm font-mono">{c.clientUid.slice(0, 8)}...</td>
+                          <td className="p-4 text-sm">{c.type}</td>
+                          <td className="p-4 text-sm">{new Date(c.scheduledAt).toLocaleString()}</td>
+                          <td className="p-4">
+                            <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
+                              c.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                              c.status === 'confirmed' ? 'bg-green-100 text-green-700' :
+                              'bg-gray-100 text-gray-700'
+                            }`}>
+                              {c.status}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => updateStatus(c.id!, ConsultationStatus.CONFIRMED)}
+                                className="p-1 text-green-600 hover:bg-green-50 rounded text-xs font-bold"
+                              >
+                                Confirm
+                              </button>
+                              <button 
+                                onClick={() => updateStatus(c.id!, ConsultationStatus.COMPLETED)}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded text-xs font-bold"
+                              >
+                                Complete
+                              </button>
+                              <button 
+                                onClick={() => handlePrint(c)}
+                                className="p-1 text-forest hover:bg-forest/5 rounded"
+                                title="Print Record"
+                              >
+                                <Printer size={14} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination */}
+              <div className="p-4 border-t border-black/5 flex items-center justify-between bg-gray-50/50">
+                <span className="text-xs font-bold text-gray-400">
+                  Showing {Math.min(allConsultations.length, (consultationPage - 1) * ITEMS_PER_PAGE + 1)} to {Math.min(allConsultations.length, consultationPage * ITEMS_PER_PAGE)} of {allConsultations.length}
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    disabled={consultationPage === 1}
+                    onClick={() => setConsultationPage(prev => prev - 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all"
+                  >
+                    Previous
+                  </button>
+                  <button 
+                    disabled={consultationPage * ITEMS_PER_PAGE >= allConsultations.length}
+                    onClick={() => setConsultationPage(prev => prev + 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : activeTab === 'tasks' ? (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-4">
+              <h3 className="text-2xl font-bold serif">Tasks & Operations</h3>
+              {selectedTasks.length > 0 && (
+                <div className="flex items-center gap-2 bg-forest/10 px-3 py-1 rounded-full">
+                  <span className="text-xs font-bold text-forest">{selectedTasks.length} Selected</span>
+                  <button 
+                    onClick={handleBulkDeleteTasks}
+                    className="p-1 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                  >
+                    <Trash2 size={14} />
+                  </button>
                   <select 
-                    onChange={(e) => handleBulkUpdateConsultationStatus(e.target.value)}
-                    className="bg-transparent text-xs font-bold text-forest outline-none cursor-pointer"
+                    className="text-[10px] bg-white border-none outline-none font-bold"
+                    onChange={(e) => handleBulkUpdateTaskStatus(e.target.value as TaskStatus)}
                     value=""
                   >
                     <option value="" disabled>Update Status</option>
-                    {Object.values(ConsultationStatus).map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
+                    <option value={TaskStatus.TODO}>To Do</option>
+                    <option value={TaskStatus.IN_PROGRESS}>In Progress</option>
+                    <option value={TaskStatus.COMPLETED}>Completed</option>
                   </select>
+                </div>
+              )}
+            </div>
+            <button 
+              onClick={() => {
+                setEditingTask(null);
+                setTaskForm({
+                  title: '',
+                  description: '',
+                  priority: TaskPriority.MEDIUM,
+                  status: TaskStatus.TODO,
+                  dueDate: new Date().toISOString().split('T')[0]
+                });
+                setIsTaskModalOpen(true);
+              }}
+              className="bg-forest text-white px-6 py-3 rounded-xl font-bold hover:bg-opacity-90 transition-all flex items-center gap-2"
+            >
+              <Plus size={20} />
+              New Task
+            </button>
+          </div>
+
+          <div className="bg-white p-4 rounded-3xl border border-black/5 flex flex-wrap gap-4 items-center">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input 
+                type="text" 
+                placeholder="Search tasks..." 
+                className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-gray-50"
+                value={taskFilter.search}
+                onChange={(e) => setTaskFilter({...taskFilter, search: e.target.value})}
+              />
+            </div>
+            <select 
+              className="p-2 rounded-xl border border-black/5 outline-none bg-gray-50 font-bold text-sm"
+              value={taskFilter.status}
+              onChange={(e) => setTaskFilter({...taskFilter, status: e.target.value})}
+            >
+              <option value="All">All Status</option>
+              <option value={TaskStatus.TODO}>To Do</option>
+              <option value={TaskStatus.IN_PROGRESS}>In Progress</option>
+              <option value={TaskStatus.COMPLETED}>Completed</option>
+            </select>
+            <select 
+              className="p-2 rounded-xl border border-black/5 outline-none bg-gray-50 font-bold text-sm"
+              value={taskFilter.priority}
+              onChange={(e) => setTaskFilter({...taskFilter, priority: e.target.value})}
+            >
+              <option value="All">All Priority</option>
+              <option value={TaskPriority.LOW}>Low</option>
+              <option value={TaskPriority.MEDIUM}>Medium</option>
+              <option value={TaskPriority.HIGH}>High</option>
+              <option value={TaskPriority.URGENT}>Urgent</option>
+            </select>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table className="w-full text-left border-collapse">
+              <thead className="sticky top-0 bg-gray-50 z-10">
+                <tr className="border-b border-black/5">
+                  <th className="p-4 w-10">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-gray-300 text-forest focus:ring-forest"
+                      checked={selectedTasks.length === tasks.length && tasks.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedTasks(tasks.map(t => t.id!));
+                        } else {
+                          setSelectedTasks([]);
+                        }
+                      }}
+                    />
+                  </th>
+                  <th className="p-4 text-sm font-bold">Task</th>
+                  <th className="p-4 text-sm font-bold">Priority</th>
+                  <th className="p-4 text-sm font-bold">Due Date</th>
+                  <th className="p-4 text-sm font-bold">Status</th>
+                  <th className="p-4 text-sm font-bold">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/5">
+                {tasks.filter(t => {
+                  const matchesSearch = t.title.toLowerCase().includes(taskFilter.search.toLowerCase()) || 
+                                       t.description.toLowerCase().includes(taskFilter.search.toLowerCase());
+                  const matchesStatus = taskFilter.status === 'All' || t.status === taskFilter.status;
+                  const matchesPriority = taskFilter.priority === 'All' || t.priority === taskFilter.priority;
+                  return matchesSearch && matchesStatus && matchesPriority;
+                })
+                .slice((taskPage - 1) * ITEMS_PER_PAGE, taskPage * ITEMS_PER_PAGE)
+                .map((task) => (
+                  <tr key={task.id} className={`hover:bg-gray-50 transition-colors ${selectedTasks.includes(task.id!) ? 'bg-forest/5' : ''}`}>
+                    <td className="p-4">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300 text-forest focus:ring-forest"
+                        checked={selectedTasks.includes(task.id!)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTasks(prev => [...prev, task.id!]);
+                          } else {
+                            setSelectedTasks(prev => prev.filter(id => id !== task.id));
+                          }
+                        }}
+                      />
+                    </td>
+                    <td className="p-4">
+                      <div className="font-bold text-sm">{task.title}</div>
+                      <div className="text-xs opacity-50 line-clamp-1">{task.description}</div>
+                    </td>
+                    <td className="p-4">
+                      <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${
+                        task.priority === TaskPriority.URGENT ? 'bg-red-100 text-red-700' :
+                        task.priority === TaskPriority.HIGH ? 'bg-orange-100 text-orange-700' :
+                        task.priority === TaskPriority.MEDIUM ? 'bg-blue-100 text-blue-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {task.priority}
+                      </span>
+                    </td>
+                    <td className="p-4 text-sm">
+                      {new Date(task.dueDate).toLocaleDateString()}
+                    </td>
+                    <td className="p-4">
+                      <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${
+                        task.status === TaskStatus.COMPLETED ? 'bg-green-100 text-green-700' :
+                        task.status === TaskStatus.IN_PROGRESS ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-gray-100 text-gray-700'
+                      }`}>
+                        {task.status}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => {
+                            setEditingTask(task);
+                            setTaskForm({ ...task });
+                            setIsTaskModalOpen(true);
+                          }}
+                          className="p-2 text-forest hover:bg-forest/5 rounded-full"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button 
+                          onClick={() => taskService.deleteTask(task.id!)}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-full"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {/* Pagination */}
+          <div className="p-4 border-t border-black/5 flex items-center justify-between bg-gray-50/50">
+            <span className="text-xs font-bold text-gray-400">
+              Showing {Math.min(tasks.length, (taskPage - 1) * ITEMS_PER_PAGE + 1)} to {Math.min(tasks.length, taskPage * ITEMS_PER_PAGE)} of {tasks.length}
+            </span>
+            <div className="flex gap-2">
+              <button 
+                disabled={taskPage === 1}
+                onClick={() => setTaskPage(prev => prev - 1)}
+                className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all"
+              >
+                Previous
+              </button>
+              <button 
+                disabled={taskPage * ITEMS_PER_PAGE >= tasks.length}
+                onClick={() => setTaskPage(prev => prev + 1)}
+                className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+      ) : activeTab === 'products' ? (
+        <div className="space-y-8">
+          <div className="flex flex-wrap justify-between items-center gap-4">
+            <div className="flex flex-wrap items-center gap-4">
+              <h3 className="text-2xl font-bold serif">Product Management</h3>
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <input 
+                  type="text" 
+                  placeholder="Search products..." 
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-white"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                />
+              </div>
+              {selectedProducts.length > 0 && (
+                <div className="flex items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10">
+                  <span className="text-sm font-bold text-forest">{selectedProducts.length} Selected</span>
                   <button 
-                    onClick={handleBulkDeleteConsultations}
-                    className="text-xs font-bold text-red-500 hover:text-red-600 flex items-center gap-1"
+                    onClick={handleBulkDeleteProducts}
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                    title="Delete Selected"
                   >
-                    <Trash2 size={14} /> Delete
+                    <Trash2 size={18} />
                   </button>
                   <button 
-                    onClick={() => setSelectedConsultations([])}
+                    onClick={() => setSelectedProducts([])}
                     className="text-xs font-bold opacity-40 hover:opacity-100"
                   >
                     Cancel
@@ -2122,117 +3012,199 @@ const Admin = () => {
                 </div>
               )}
             </div>
-            <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-black/5">
-                    <th className="p-4 w-10">
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={async () => {
+                  showConfirm(
+                    "Seed Products",
+                    "This will add Jagunlabi Bitters and other initial products if they don't exist. Continue?",
+                    async () => {
+                      await seedService.seedProducts();
+                      showToast("Seeding complete!", "success");
+                    }
+                  );
+                }}
+                className="bg-gold/10 text-gold px-4 py-2 rounded-xl font-bold hover:bg-gold/20 transition-all text-sm"
+              >
+                Seed Initial Data
+              </button>
+              <button 
+                onClick={() => {
+                  setEditingProduct(null);
+                  setProductForm({
+                    name: '',
+                    description: '',
+                    price: 0,
+                    stock: 0,
+                    category: '',
+                    imageUrl: '',
+                    featured: false
+                  });
+                  setIsProductModalOpen(true);
+                }}
+                className="bg-forest text-white px-6 py-3 rounded-xl font-bold hover:bg-opacity-90 transition-all flex items-center gap-2"
+              >
+                <Plus size={20} />
+                New Product
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+              <table className="w-full text-left">
+              <thead className="sticky top-0 bg-gray-50 border-b border-black/5 z-10">
+                <tr>
+                  <th className="p-4 w-10">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-gray-300 text-forest focus:ring-forest"
+                      checked={selectedProducts.length === products.length && products.length > 0}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedProducts(products.map(p => p.id!));
+                        } else {
+                          setSelectedProducts([]);
+                        }
+                      }}
+                    />
+                  </th>
+                  <th className="p-4 text-sm font-bold">Product</th>
+                  <th className="p-4 text-sm font-bold">Price</th>
+                  <th className="p-4 text-sm font-bold">Stock</th>
+                  <th className="p-4 text-sm font-bold">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-black/5">
+                {products.filter(p => 
+                  p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
+                  p.category.toLowerCase().includes(productSearch.toLowerCase())
+                ).map((p) => (
+                  <tr key={p.id} className={`hover:bg-gray-50 transition-colors ${selectedProducts.includes(p.id!) ? 'bg-forest/5' : ''}`}>
+                    <td className="p-4">
                       <input 
                         type="checkbox" 
                         className="rounded border-gray-300 text-forest focus:ring-forest"
-                        checked={selectedConsultations.length === allConsultations.length && allConsultations.length > 0}
+                        checked={selectedProducts.includes(p.id!)}
                         onChange={(e) => {
-                          if (e.target.checked) setSelectedConsultations(allConsultations.map(c => c.id!));
-                          else setSelectedConsultations([]);
+                          if (e.target.checked) {
+                            setSelectedProducts(prev => [...prev, p.id!]);
+                          } else {
+                            setSelectedProducts(prev => prev.filter(id => id !== p.id));
+                          }
                         }}
                       />
-                    </th>
-                    <th className="p-4 text-sm font-bold">Client</th>
-                    <th className="p-4 text-sm font-bold">Type</th>
-                    <th className="p-4 text-sm font-bold">Scheduled At</th>
-                    <th className="p-4 text-sm font-bold">Status</th>
-                    <th className="p-4 text-sm font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allConsultations.map((c) => (
-                    <tr key={c.id} className={`border-b border-black/5 hover:bg-gray-50 transition-colors ${selectedConsultations.includes(c.id!) ? 'bg-forest/5' : ''}`}>
-                      <td className="p-4">
-                        <input 
-                          type="checkbox" 
-                          className="rounded border-gray-300 text-forest focus:ring-forest"
-                          checked={selectedConsultations.includes(c.id!)}
-                          onChange={(e) => {
-                            if (e.target.checked) setSelectedConsultations([...selectedConsultations, c.id!]);
-                            else setSelectedConsultations(selectedConsultations.filter(id => id !== c.id));
-                          }}
+                    </td>
+                    <td className="p-4">
+                      <div className="flex items-center gap-3">
+                        <img 
+                          src={p.imageUrl || `https://picsum.photos/seed/${p.name}/50/50`} 
+                          className="w-10 h-10 rounded-lg object-cover"
+                          referrerPolicy="no-referrer"
                         />
-                      </td>
-                      <td className="p-4 text-sm font-mono">{c.clientUid.slice(0, 8)}...</td>
-                      <td className="p-4 text-sm">{c.type}</td>
-                      <td className="p-4 text-sm">{new Date(c.scheduledAt).toLocaleString()}</td>
-                      <td className="p-4">
-                        <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
-                          c.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
-                          c.status === 'confirmed' ? 'bg-green-100 text-green-700' :
-                          'bg-gray-100 text-gray-700'
-                        }`}>
-                          {c.status}
-                        </span>
-                      </td>
-                      <td className="p-4 flex gap-2">
+                        <div>
+                          <div className="font-bold text-sm flex items-center gap-2">
+                            {p.name}
+                            {p.featured && <Star size={12} className="text-gold fill-gold" />}
+                          </div>
+                          <div className="text-xs opacity-50">{p.category}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="p-4 text-sm font-bold">{formatCurrency(p.price, currency)}</td>
+                    <td className="p-4 text-sm">{p.stock}</td>
+                    <td className="p-4">
+                      <div className="flex gap-2">
                         <button 
-                          onClick={() => updateStatus(c.id!, ConsultationStatus.CONFIRMED)}
-                          className="p-1 text-green-600 hover:bg-green-50 rounded"
+                          onClick={() => {
+                            setEditingProduct(p);
+                            setProductForm({...p});
+                            setIsProductModalOpen(true);
+                          }}
+                          className="p-2 text-forest hover:bg-forest/5 rounded-full"
+                          title="Edit"
                         >
-                          Confirm
+                          <Edit2 size={18} />
                         </button>
                         <button 
-                          onClick={() => updateStatus(c.id!, ConsultationStatus.COMPLETED)}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                          onClick={() => handleDeleteProduct(p.id!)}
+                          className="p-2 text-red-500 hover:bg-red-50 rounded-full"
+                          title="Delete"
                         >
-                          Complete
+                          <Trash2 size={18} />
                         </button>
-                        <button 
-                          onClick={() => handlePrint(c)}
-                          className="p-1 text-forest hover:bg-forest/5 rounded"
-                          title="Print Record"
-                        >
-                          <Printer size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {hasMoreProducts && (
+              <div className="p-4 border-t border-black/5 flex justify-center bg-gray-50/50">
+                <button 
+                  onClick={() => fetchAdminProducts()}
+                  disabled={isLoadingProducts}
+                  className="text-xs font-bold text-forest hover:underline flex items-center gap-2"
+                >
+                  {isLoadingProducts ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
+                  Load More Products
+                </button>
+              </div>
+            )}
+          </div>
         </div>
+      </div>
       ) : activeTab === 'orders' ? (
         <div className="grid grid-cols-1 gap-8">
           <section>
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <Truck className="text-forest" />
                 Manage Orders
               </h3>
-              {selectedOrders.length > 0 && (
-                <div className="flex items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 animate-in fade-in slide-in-from-top-2">
-                  <span className="text-sm font-bold text-forest">{selectedOrders.length} Selected</span>
-                  <div className="h-4 w-[1px] bg-forest/20" />
-                  <select 
-                    onChange={(e) => handleBulkUpdateOrderStatus(e.target.value)}
-                    className="bg-transparent text-xs font-bold text-forest outline-none cursor-pointer"
-                    value=""
-                  >
-                    <option value="" disabled>Update Status</option>
-                    {Object.values(OrderStatus).map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
-                  <button 
-                    onClick={() => setSelectedOrders([])}
-                    className="text-xs font-bold opacity-40 hover:opacity-100"
-                  >
-                    Cancel
-                  </button>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search orders..." 
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-white"
+                    value={orderSearch}
+                    onChange={(e) => {
+                      setOrderSearch(e.target.value);
+                      setOrderPage(1);
+                    }}
+                  />
                 </div>
-              )}
+                {selectedOrders.length > 0 && (
+                  <div className="flex items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 animate-in fade-in slide-in-from-top-2">
+                    <span className="text-sm font-bold text-forest">{selectedOrders.length} Selected</span>
+                    <div className="h-4 w-[1px] bg-forest/20" />
+                    <select 
+                      onChange={(e) => handleBulkUpdateOrderStatus(e.target.value)}
+                      className="bg-transparent text-xs font-bold text-forest outline-none cursor-pointer"
+                      value=""
+                    >
+                      <option value="" disabled>Update Status</option>
+                      {Object.values(OrderStatus).map(s => (
+                        <option key={s} value={s}>{s}</option>
+                      ))}
+                    </select>
+                    <button 
+                      onClick={() => setSelectedOrders([])}
+                      className="text-xs font-bold opacity-40 hover:opacity-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
             <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-black/5">
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-gray-50 z-10">
+                  <tr className="border-b border-black/5">
                     <th className="p-4 w-10">
                       <input 
                         type="checkbox" 
@@ -2251,53 +3223,83 @@ const Admin = () => {
                     <th className="p-4 text-sm font-bold">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {allOrders.map((o) => (
-                    <tr key={o.id} className={`border-b border-black/5 hover:bg-gray-50 transition-colors ${selectedOrders.includes(o.id!) ? 'bg-forest/5' : ''}`}>
-                      <td className="p-4">
-                        <input 
-                          type="checkbox" 
-                          className="rounded border-gray-300 text-forest focus:ring-forest"
-                          checked={selectedOrders.includes(o.id!)}
-                          onChange={(e) => {
-                            if (e.target.checked) setSelectedOrders([...selectedOrders, o.id!]);
-                            else setSelectedOrders(selectedOrders.filter(id => id !== o.id));
-                          }}
-                        />
-                      </td>
-                      <td className="p-4">
-                        <div className="font-bold text-sm">{o.customerName}</div>
-                        <div className="text-xs opacity-50">{o.email}</div>
-                      </td>
-                      <td className="p-4 text-sm">{o.items.length} items</td>
-                      <td className="p-4 text-sm font-bold">{formatCurrency(o.totalAmount, currency)}</td>
-                      <td className="p-4">
-                        <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
-                          o.status === 'delivered' ? 'bg-green-100 text-green-700' :
-                          o.status === 'cancelled' ? 'bg-red-100 text-red-700' :
-                          'bg-forest/10 text-forest'
-                        }`}>
-                          {o.status}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <select 
-                          value={o.status}
-                          onChange={(e) => updateOrderStatus(o.id!, e.target.value as OrderStatus)}
-                          className="text-xs p-1 rounded border border-gray-200 outline-none"
-                        >
-                          {Object.values(OrderStatus).map(s => (
-                            <option key={s} value={s}>{s}</option>
-                          ))}
-                        </select>
-                      </td>
-                    </tr>
-                  ))}
+                <tbody className="divide-y divide-black/5">
+                  {allOrders
+                    .filter(o => 
+                      o.customerName.toLowerCase().includes(orderSearch.toLowerCase()) ||
+                      o.email.toLowerCase().includes(orderSearch.toLowerCase()) ||
+                      o.status.toLowerCase().includes(orderSearch.toLowerCase())
+                    )
+                    .slice((orderPage - 1) * ITEMS_PER_PAGE, orderPage * ITEMS_PER_PAGE)
+                    .map((o) => (
+                      <tr key={o.id} className={`hover:bg-gray-50 transition-colors ${selectedOrders.includes(o.id!) ? 'bg-forest/5' : ''}`}>
+                        <td className="p-4">
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-gray-300 text-forest focus:ring-forest"
+                            checked={selectedOrders.includes(o.id!)}
+                            onChange={(e) => {
+                              if (e.target.checked) setSelectedOrders([...selectedOrders, o.id!]);
+                              else setSelectedOrders(selectedOrders.filter(id => id !== o.id));
+                            }}
+                          />
+                        </td>
+                        <td className="p-4">
+                          <div className="font-bold text-sm">{o.customerName}</div>
+                          <div className="text-xs opacity-50">{o.email}</div>
+                        </td>
+                        <td className="p-4 text-sm">{o.items.length} items</td>
+                        <td className="p-4 text-sm font-bold">{formatCurrency(o.totalAmount, currency)}</td>
+                        <td className="p-4">
+                          <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
+                            o.status === 'delivered' ? 'bg-green-100 text-green-700' :
+                            o.status === 'cancelled' ? 'bg-red-100 text-red-700' :
+                            'bg-forest/10 text-forest'
+                          }`}>
+                            {o.status}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <select 
+                            value={o.status}
+                            onChange={(e) => updateOrderStatus(o.id!, e.target.value as OrderStatus)}
+                            className="text-xs p-1 rounded border border-gray-200 outline-none"
+                          >
+                            {Object.values(OrderStatus).map(s => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
-          </section>
-        </div>
+            {/* Pagination */}
+            <div className="p-4 border-t border-black/5 flex items-center justify-between bg-gray-50/50">
+              <span className="text-xs font-bold text-gray-400">
+                Showing {Math.min(allOrders.length, (orderPage - 1) * ITEMS_PER_PAGE + 1)} to {Math.min(allOrders.length, orderPage * ITEMS_PER_PAGE)} of {allOrders.length}
+              </span>
+              <div className="flex gap-2">
+                <button 
+                  disabled={orderPage === 1}
+                  onClick={() => setOrderPage(prev => prev - 1)}
+                  className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all"
+                >
+                  Previous
+                </button>
+                <button 
+                  disabled={orderPage * ITEMS_PER_PAGE >= allOrders.length}
+                  onClick={() => setOrderPage(prev => prev + 1)}
+                  className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
       ) : activeTab === 'babalawos' ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Add/Edit Babalawo Form */}
@@ -2400,53 +3402,141 @@ const Admin = () => {
           {/* Babalawo List */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-black/5">
-                    <th className="p-4 text-sm font-bold">Babaláwo</th>
-                    <th className="p-4 text-sm font-bold">Specialty</th>
-                    <th className="p-4 text-sm font-bold">Availability</th>
-                    <th className="p-4 text-sm font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {babalawos.map((b) => (
-                    <tr key={b.id} className="border-b border-black/5 hover:bg-gray-50 transition-colors">
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <img 
-                            src={b.imageUrl || `https://picsum.photos/seed/${b.name}/50/50`} 
-                            className="w-10 h-10 rounded-lg object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                          <div>
-                            <div className="font-bold text-sm">{b.name}</div>
-                            <div className="text-[10px] opacity-50 truncate max-w-[150px]">{b.bio}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4 text-sm">{b.specialty}</td>
-                      <td className="p-4 text-sm">{b.availability}</td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => setEditingBabalawo(b)}
-                            className="p-2 text-forest hover:bg-forest/5 rounded-full transition-colors"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteBabalawo(b.id!)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
+              <div className="p-4 border-b border-black/5 flex flex-wrap justify-between items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <h4 className="font-bold">Babaláwos</h4>
+                  {selectedBabalawos.length > 0 && (
+                    <div className="flex items-center gap-2 bg-forest/10 px-3 py-1 rounded-full">
+                      <span className="text-xs font-bold text-forest">{selectedBabalawos.length} Selected</span>
+                      <button 
+                        onClick={handleBulkDeleteBabalawos}
+                        className="p-1 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                        title="Delete Selected"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="relative w-48">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search Babaláwos..." 
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-gray-50 text-sm"
+                    value={babalawoSearch}
+                    onChange={(e) => {
+                      setBabalawoSearch(e.target.value);
+                      setBabalawoPage(1);
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-gray-50 z-10">
+                    <tr className="border-b border-black/5">
+                      <th className="p-4 w-10">
+                        <input 
+                          type="checkbox" 
+                          className="rounded border-gray-300 text-forest focus:ring-forest"
+                          checked={selectedBabalawos.length === babalawos.length && babalawos.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedBabalawos(babalawos.map(b => b.id!));
+                            } else {
+                              setSelectedBabalawos([]);
+                            }
+                          }}
+                        />
+                      </th>
+                      <th className="p-4 text-sm font-bold">Babaláwo</th>
+                      <th className="p-4 text-sm font-bold">Specialty</th>
+                      <th className="p-4 text-sm font-bold">Availability</th>
+                      <th className="p-4 text-sm font-bold">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-black/5">
+                    {babalawos
+                      .filter(b => 
+                        b.name.toLowerCase().includes(babalawoSearch.toLowerCase()) ||
+                        b.specialty.toLowerCase().includes(babalawoSearch.toLowerCase())
+                      )
+                      .slice((babalawoPage - 1) * ITEMS_PER_PAGE, babalawoPage * ITEMS_PER_PAGE)
+                      .map((b) => (
+                        <tr key={b.id} className={`hover:bg-gray-50 transition-colors ${selectedBabalawos.includes(b.id!) ? 'bg-forest/5' : ''}`}>
+                          <td className="p-4">
+                            <input 
+                              type="checkbox" 
+                              className="rounded border-gray-300 text-forest focus:ring-forest"
+                              checked={selectedBabalawos.includes(b.id!)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedBabalawos(prev => [...prev, b.id!]);
+                                } else {
+                                  setSelectedBabalawos(prev => prev.filter(id => id !== b.id));
+                                }
+                              }}
+                            />
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <img 
+                                src={b.imageUrl || `https://picsum.photos/seed/${b.name}/50/50`} 
+                                className="w-10 h-10 rounded-lg object-cover"
+                                referrerPolicy="no-referrer"
+                              />
+                              <div>
+                                <div className="font-bold text-sm">{b.name}</div>
+                                <div className="text-[10px] opacity-50 truncate max-w-[150px]">{b.bio}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4 text-sm">{b.specialty}</td>
+                          <td className="p-4 text-sm">{b.availability}</td>
+                          <td className="p-4">
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => setEditingBabalawo(b)}
+                                className="p-2 text-forest hover:bg-forest/5 rounded-full transition-colors"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteBabalawo(b.id!)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination */}
+              <div className="p-4 border-t border-black/5 flex items-center justify-between bg-gray-50/50">
+                <span className="text-xs font-bold text-gray-400">
+                  Showing {Math.min(babalawos.length, (babalawoPage - 1) * ITEMS_PER_PAGE + 1)} to {Math.min(babalawos.length, babalawoPage * ITEMS_PER_PAGE)} of {babalawos.length}
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    disabled={babalawoPage === 1}
+                    onClick={() => setBabalawoPage(prev => prev - 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                  >
+                    Previous
+                  </button>
+                  <button 
+                    disabled={babalawoPage * ITEMS_PER_PAGE >= babalawos.length}
+                    onClick={() => setBabalawoPage(prev => prev + 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2525,65 +3615,150 @@ const Admin = () => {
           {/* Video List */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-black/5">
+              <div className="p-4 border-b border-black/5 flex flex-wrap justify-between items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <h4 className="font-bold">Videos</h4>
+                  {selectedVideos.length > 0 && (
+                    <div className="flex items-center gap-2 bg-forest/10 px-3 py-1 rounded-full">
+                      <span className="text-xs font-bold text-forest">{selectedVideos.length} Selected</span>
+                      <button 
+                        onClick={handleBulkDeleteVideos}
+                        className="p-1 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                        title="Delete Selected"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="relative w-48">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search videos..." 
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-gray-50 text-sm"
+                    value={videoSearch}
+                    onChange={(e) => {
+                      setVideoSearch(e.target.value);
+                      setVideoPage(1);
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-gray-50 z-10">
+                  <tr className="border-b border-black/5">
+                    <th className="p-4 w-10">
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-gray-300 text-forest focus:ring-forest"
+                        checked={selectedVideos.length === allVideos.length && allVideos.length > 0}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedVideos(allVideos.map(v => v.id!));
+                          } else {
+                            setSelectedVideos([]);
+                          }
+                        }}
+                      />
+                    </th>
                     <th className="p-4 text-sm font-bold">Video</th>
                     <th className="p-4 text-sm font-bold">Access</th>
                     <th className="p-4 text-sm font-bold">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {allVideos.map((v) => (
-                    <tr key={v.id} className="border-b border-black/5 hover:bg-gray-50 transition-colors">
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <img 
-                            src={v.thumbnailUrl || `https://img.youtube.com/vi/${v.youtubeId}/default.jpg`} 
-                            className="w-16 h-10 rounded-lg object-cover"
-                            referrerPolicy="no-referrer"
+                <tbody className="divide-y divide-black/5">
+                  {allVideos
+                    .filter(v => 
+                      v.title.toLowerCase().includes(videoSearch.toLowerCase()) ||
+                      v.description.toLowerCase().includes(videoSearch.toLowerCase())
+                    )
+                    .slice((videoPage - 1) * ITEMS_PER_PAGE, videoPage * ITEMS_PER_PAGE)
+                    .map((v) => (
+                      <tr key={v.id} className={`hover:bg-gray-50 transition-colors ${selectedVideos.includes(v.id!) ? 'bg-forest/5' : ''}`}>
+                        <td className="p-4">
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-gray-300 text-forest focus:ring-forest"
+                            checked={selectedVideos.includes(v.id!)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedVideos(prev => [...prev, v.id!]);
+                              } else {
+                                setSelectedVideos(prev => prev.filter(id => id !== v.id));
+                              }
+                            }}
                           />
-                          <div>
-                            <div className="font-bold text-sm">{v.title}</div>
-                            <div className="text-xs opacity-50 line-clamp-1">{v.description}</div>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            <img 
+                              src={v.thumbnailUrl || `https://img.youtube.com/vi/${v.youtubeId}/default.jpg`} 
+                              className="w-16 h-10 rounded-lg object-cover"
+                              referrerPolicy="no-referrer"
+                            />
+                            <div>
+                              <div className="font-bold text-sm">{v.title}</div>
+                              <div className="text-xs opacity-50 line-clamp-1">{v.description}</div>
+                            </div>
                           </div>
-                        </div>
-                      </td>
-                      <td className="p-4 text-sm">
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                          v.requiredLevel === 2 ? 'bg-red-100 text-red-600' : 
-                          v.requiredLevel === 1 ? 'bg-blue-100 text-blue-600' : 
-                          'bg-green-100 text-green-600'
-                        }`}>
-                          {v.requiredLevel === 2 ? 'Admin' : v.requiredLevel === 1 ? 'Client' : 'Public'}
-                        </span>
-                      </td>
-                      <td className="p-4 text-sm font-mono">{v.youtubeId}</td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => setEditingVideo(v)}
-                            className="p-2 text-forest hover:bg-forest/5 rounded-full"
-                            title="Edit"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteVideo(v.id!)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-full"
-                            title="Delete"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="p-4 text-sm">
+                          <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                            v.requiredLevel === 2 ? 'bg-red-100 text-red-600' : 
+                            v.requiredLevel === 1 ? 'bg-blue-100 text-blue-600' : 
+                            'bg-green-100 text-green-600'
+                          }`}>
+                            {v.requiredLevel === 2 ? 'Admin' : v.requiredLevel === 1 ? 'Client' : 'Public'}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => setEditingVideo(v)}
+                              className="p-2 text-forest hover:bg-forest/5 rounded-full transition-colors"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteVideo(v.id!)}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
+            {/* Pagination */}
+            <div className="p-4 border-t border-black/5 flex items-center justify-between bg-gray-50/50">
+              <span className="text-xs font-bold text-gray-400">
+                Showing {Math.min(allVideos.length, (videoPage - 1) * ITEMS_PER_PAGE + 1)} to {Math.min(allVideos.length, videoPage * ITEMS_PER_PAGE)} of {allVideos.length}
+              </span>
+              <div className="flex gap-2">
+                <button 
+                  disabled={videoPage === 1}
+                  onClick={() => setVideoPage(prev => prev - 1)}
+                  className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                >
+                  Previous
+                </button>
+                <button 
+                  disabled={videoPage * ITEMS_PER_PAGE >= allVideos.length}
+                  onClick={() => setVideoPage(prev => prev + 1)}
+                  className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
       ) : activeTab === 'staff' ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Add/Edit Staff Form */}
@@ -2742,101 +3917,127 @@ const Admin = () => {
                   </select>
                 </div>
               </div>
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-black/5">
-                    <th className="p-4 w-10">
-                      <input 
-                        type="checkbox" 
-                        className="rounded border-gray-300 text-forest focus:ring-forest"
-                        checked={selectedStaff.length === allStaff.length && allStaff.length > 0}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedStaff(allStaff.map(s => s.id!));
-                          } else {
-                            setSelectedStaff([]);
-                          }
-                        }}
-                      />
-                    </th>
-                    <th className="p-4 text-sm font-bold">Staff</th>
-                    <th className="p-4 text-sm font-bold">Role/Dept</th>
-                    <th className="p-4 text-sm font-bold">Status</th>
-                    <th className="p-4 text-sm font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {allStaff.filter(s => {
-                    const matchesSearch = s.name.toLowerCase().includes(staffSearch.toLowerCase()) || 
-                                         s.role.toLowerCase().includes(staffSearch.toLowerCase()) ||
-                                         s.department?.toLowerCase().includes(staffSearch.toLowerCase());
-                    const matchesDept = selectedStaffDepartment === 'All' || s.department === selectedStaffDepartment;
-                    const matchesStatus = selectedStaffStatus === 'All' || s.status === selectedStaffStatus;
-                    return matchesSearch && matchesDept && matchesStatus;
-                  }).map((s) => (
-                    <tr key={s.id} className={`border-b border-black/5 hover:bg-gray-50 transition-colors ${selectedStaff.includes(s.id!) ? 'bg-forest/5' : ''}`}>
-                      <td className="p-4">
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-gray-50 z-10">
+                    <tr className="border-b border-black/5">
+                      <th className="p-4 w-10">
                         <input 
                           type="checkbox" 
                           className="rounded border-gray-300 text-forest focus:ring-forest"
-                          checked={selectedStaff.includes(s.id!)}
+                          checked={selectedStaff.length === allStaff.length && allStaff.length > 0}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedStaff(prev => [...prev, s.id!]);
+                              setSelectedStaff(allStaff.map(s => s.id!));
                             } else {
-                              setSelectedStaff(prev => prev.filter(id => id !== s.id));
+                              setSelectedStaff([]);
                             }
                           }}
                         />
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          {s.profileVideoUrl ? (
-                            <div className="w-8 h-8 rounded-full bg-forest/10 flex items-center justify-center text-forest">
-                              <Play size={14} />
-                            </div>
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
-                              <User size={14} />
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-bold text-sm">{s.name}</div>
-                            <div className="text-xs opacity-50">{s.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="text-sm font-bold">{s.role}</div>
-                        <div className="text-xs opacity-50">{s.department}</div>
-                      </td>
-                      <td className="p-4">
-                        <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
-                          s.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                        }`}>
-                          {s.status}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => setEditingStaff(s)}
-                            className="p-2 text-forest hover:bg-forest/5 rounded-full"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteStaff(s.id!)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-full"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
+                      </th>
+                      <th className="p-4 text-sm font-bold">Staff</th>
+                      <th className="p-4 text-sm font-bold">Role/Dept</th>
+                      <th className="p-4 text-sm font-bold">Status</th>
+                      <th className="p-4 text-sm font-bold">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-black/5">
+                    {allStaff.filter(s => {
+                      const matchesSearch = s.name.toLowerCase().includes(staffSearch.toLowerCase()) || 
+                                           s.role.toLowerCase().includes(staffSearch.toLowerCase()) ||
+                                           s.department?.toLowerCase().includes(staffSearch.toLowerCase());
+                      const matchesDept = selectedStaffDepartment === 'All' || s.department === selectedStaffDepartment;
+                      const matchesStatus = selectedStaffStatus === 'All' || s.status === selectedStaffStatus;
+                      return matchesSearch && matchesDept && matchesStatus;
+                    })
+                    .slice((staffPage - 1) * ITEMS_PER_PAGE, staffPage * ITEMS_PER_PAGE)
+                    .map((s) => (
+                      <tr key={s.id} className={`hover:bg-gray-50 transition-colors ${selectedStaff.includes(s.id!) ? 'bg-forest/5' : ''}`}>
+                        <td className="p-4">
+                          <input 
+                            type="checkbox" 
+                            className="rounded border-gray-300 text-forest focus:ring-forest"
+                            checked={selectedStaff.includes(s.id!)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedStaff(prev => [...prev, s.id!]);
+                              } else {
+                                setSelectedStaff(prev => prev.filter(id => id !== s.id));
+                              }
+                            }}
+                          />
+                        </td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-3">
+                            {s.profileVideoUrl ? (
+                              <div className="w-8 h-8 rounded-full bg-forest/10 flex items-center justify-center text-forest">
+                                <Play size={14} />
+                              </div>
+                            ) : (
+                              <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400">
+                                <User size={14} />
+                              </div>
+                            )}
+                            <div>
+                              <div className="font-bold text-sm">{s.name}</div>
+                              <div className="text-xs opacity-50">{s.email}</div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="text-sm font-bold">{s.role}</div>
+                          <div className="text-xs opacity-50">{s.department}</div>
+                        </td>
+                        <td className="p-4">
+                          <span className={`text-xs px-2 py-1 rounded-full font-bold uppercase ${
+                            s.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
+                          }`}>
+                            {s.status}
+                          </span>
+                        </td>
+                        <td className="p-4">
+                          <div className="flex gap-2">
+                            <button 
+                              onClick={() => setEditingStaff(s)}
+                              className="p-2 text-forest hover:bg-forest/5 rounded-full"
+                            >
+                              <Edit2 size={18} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteStaff(s.id!)}
+                              className="p-2 text-red-500 hover:bg-red-50 rounded-full"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination */}
+              <div className="p-4 border-t border-black/5 flex items-center justify-between bg-gray-50/50">
+                <span className="text-xs font-bold text-gray-400">
+                  Showing {Math.min(allStaff.length, (staffPage - 1) * ITEMS_PER_PAGE + 1)} to {Math.min(allStaff.length, staffPage * ITEMS_PER_PAGE)} of {allStaff.length}
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    disabled={staffPage === 1}
+                    onClick={() => setStaffPage(prev => prev - 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                  >
+                    Previous
+                  </button>
+                  <button 
+                    disabled={staffPage * ITEMS_PER_PAGE >= allStaff.length}
+                    onClick={() => setStaffPage(prev => prev + 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2914,7 +4115,7 @@ const Admin = () => {
           {/* FAQ List */}
           <div className="lg:col-span-2">
             <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
-              <div className="p-4 border-b border-black/5 flex justify-between items-center">
+              <div className="p-4 border-b border-black/5 flex flex-wrap justify-between items-center gap-4">
                 <div className="flex items-center gap-4">
                   <h4 className="font-bold">FAQs</h4>
                   {selectedFaqs.length > 0 && (
@@ -2937,93 +4138,139 @@ const Admin = () => {
                     </div>
                   )}
                 </div>
-                <button 
-                  onClick={async () => {
-                    showConfirm(
-                      "Seed FAQs",
-                      "This will add 50 initial FAQs if they don't exist. Continue?",
-                      async () => {
-                        await seedService.seedFaqs();
-                        showToast("Seeding complete!", "success");
-                      }
-                    );
-                  }}
-                  className="text-[10px] bg-gold/10 text-gold px-2 py-1 rounded-lg font-bold hover:bg-gold/20 transition-all"
-                >
-                  Seed 50 FAQs
-                </button>
+                <div className="flex flex-wrap gap-2 items-center">
+                  <div className="relative w-48">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                    <input 
+                      type="text" 
+                      placeholder="Search FAQs..." 
+                      className="w-full pl-9 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-gray-50 text-xs"
+                      value={faqSearch}
+                      onChange={(e) => {
+                        setFaqSearch(e.target.value);
+                        setFaqPage(1);
+                      }}
+                    />
+                  </div>
+                  <button 
+                    onClick={async () => {
+                      showConfirm(
+                        "Seed FAQs",
+                        "This will add 50 initial FAQs if they don't exist. Continue?",
+                        async () => {
+                          await seedService.seedFaqs();
+                          showToast("Seeding complete!", "success");
+                        }
+                      );
+                    }}
+                    className="text-[10px] bg-gold/10 text-gold px-2 py-1 rounded-lg font-bold hover:bg-gold/20 transition-all"
+                  >
+                    Seed 50 FAQs
+                  </button>
+                </div>
               </div>
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-black/5">
-                    <th className="p-4 w-10">
-                      <input 
-                        type="checkbox" 
-                        className="rounded border-gray-300 text-forest focus:ring-forest"
-                        checked={selectedFaqs.length === faqs.length && faqs.length > 0}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedFaqs(faqs.map(f => f.id!));
-                          } else {
-                            setSelectedFaqs([]);
-                          }
-                        }}
-                      />
-                    </th>
-                    <th className="p-4 text-sm font-bold">Question</th>
-                    <th className="p-4 text-sm font-bold">Category</th>
-                    <th className="p-4 text-sm font-bold">Order</th>
-                    <th className="p-4 text-sm font-bold">Status</th>
-                    <th className="p-4 text-sm font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {faqs.map((f) => (
-                    <tr key={f.id} className={`border-b border-black/5 hover:bg-gray-50 transition-colors ${selectedFaqs.includes(f.id!) ? 'bg-forest/5' : ''}`}>
-                      <td className="p-4">
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-gray-50 z-10">
+                    <tr className="border-b border-black/5">
+                      <th className="p-4 w-10">
                         <input 
                           type="checkbox" 
                           className="rounded border-gray-300 text-forest focus:ring-forest"
-                          checked={selectedFaqs.includes(f.id!)}
+                          checked={selectedFaqs.length === faqs.length && faqs.length > 0}
                           onChange={(e) => {
                             if (e.target.checked) {
-                              setSelectedFaqs(prev => [...prev, f.id!]);
+                              setSelectedFaqs(faqs.map(f => f.id!));
                             } else {
-                              setSelectedFaqs(prev => prev.filter(id => id !== f.id));
+                              setSelectedFaqs([]);
                             }
                           }}
                         />
-                      </td>
-                      <td className="p-4 text-sm font-bold">{f.question}</td>
-                      <td className="p-4 text-sm">{f.category}</td>
-                      <td className="p-4 text-sm">{f.order}</td>
-                      <td className="p-4">
-                        <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${
-                          f.isPublished ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
-                        }`}>
-                          {f.isPublished ? 'Published' : 'Draft'}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => setEditingFaq(f)}
-                            className="p-2 text-forest hover:bg-forest/5 rounded-full transition-colors"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteFAQ(f.id!)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </td>
+                      </th>
+                      <th className="p-4 text-sm font-bold">Question</th>
+                      <th className="p-4 text-sm font-bold">Category</th>
+                      <th className="p-4 text-sm font-bold">Order</th>
+                      <th className="p-4 text-sm font-bold">Status</th>
+                      <th className="p-4 text-sm font-bold">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-black/5">
+                    {faqs
+                      .filter(f => 
+                        f.question.toLowerCase().includes(faqSearch.toLowerCase()) ||
+                        f.answer.toLowerCase().includes(faqSearch.toLowerCase()) ||
+                        f.category.toLowerCase().includes(faqSearch.toLowerCase())
+                      )
+                      .slice((faqPage - 1) * ITEMS_PER_PAGE, faqPage * ITEMS_PER_PAGE)
+                      .map((f) => (
+                        <tr key={f.id} className={`hover:bg-gray-50 transition-colors ${selectedFaqs.includes(f.id!) ? 'bg-forest/5' : ''}`}>
+                          <td className="p-4">
+                            <input 
+                              type="checkbox" 
+                              className="rounded border-gray-300 text-forest focus:ring-forest"
+                              checked={selectedFaqs.includes(f.id!)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedFaqs(prev => [...prev, f.id!]);
+                                } else {
+                                  setSelectedFaqs(prev => prev.filter(id => id !== f.id));
+                                }
+                              }}
+                            />
+                          </td>
+                          <td className="p-4 text-sm font-bold">{f.question}</td>
+                          <td className="p-4 text-sm">{f.category}</td>
+                          <td className="p-4 text-sm">{f.order}</td>
+                          <td className="p-4">
+                            <span className={`text-[10px] px-2 py-1 rounded-full font-bold uppercase ${
+                              f.isPublished ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {f.isPublished ? 'Published' : 'Draft'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => setEditingFaq(f)}
+                                className="p-2 text-forest hover:bg-forest/5 rounded-full transition-colors"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteFAQ(f.id!)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination */}
+              <div className="p-4 border-t border-black/5 flex items-center justify-between bg-gray-50/50">
+                <span className="text-xs font-bold text-gray-400">
+                  Showing {Math.min(faqs.length, (faqPage - 1) * ITEMS_PER_PAGE + 1)} to {Math.min(faqs.length, faqPage * ITEMS_PER_PAGE)} of {faqs.length}
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    disabled={faqPage === 1}
+                    onClick={() => setFaqPage(prev => prev - 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                  >
+                    Previous
+                  </button>
+                  <button 
+                    disabled={faqPage * ITEMS_PER_PAGE >= faqs.length}
+                    onClick={() => setFaqPage(prev => prev + 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -3063,6 +4310,16 @@ const Admin = () => {
                   </div>
                 )}
                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <button 
+                    onClick={() => {
+                      setSelectedMedia(file);
+                      setIsMediaModalOpen(true);
+                    }}
+                    className="p-2 bg-white text-forest rounded-full hover:scale-110 transition-transform"
+                    title="View"
+                  >
+                    <Eye size={18} />
+                  </button>
                   <button 
                     onClick={() => {
                       navigator.clipboard.writeText(file.url);
@@ -3197,7 +4454,27 @@ const Admin = () => {
       ) : activeTab === 'pages' ? (
         <div className="space-y-8">
           <div className="flex justify-between items-center">
-            <h3 className="text-2xl font-bold serif">Page Management</h3>
+            <div className="flex items-center gap-4">
+              <h3 className="text-2xl font-bold serif">Page Management</h3>
+              {selectedPages.length > 0 && (
+                <div className="flex items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10">
+                  <span className="text-sm font-bold text-forest">{selectedPages.length} Selected</span>
+                  <button 
+                    onClick={handleBulkDeletePages}
+                    className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                    title="Delete Selected"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                  <button 
+                    onClick={() => setSelectedPages([])}
+                    className="text-xs font-bold opacity-40 hover:opacity-100"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              )}
+            </div>
             <div className="flex items-center gap-4">
               <button 
                 onClick={() => setIsVisualEditor(!isVisualEditor)}
@@ -3225,8 +4502,21 @@ const Admin = () => {
           {isVisualEditor ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {pages.map(page => (
-                <div key={page.id} className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm hover:shadow-md transition-all group">
-                  <div className="flex justify-between items-start mb-4">
+                <div key={page.id} className={`bg-white p-6 rounded-3xl border transition-all group relative ${
+                  selectedPages.includes(page.id!) ? 'border-forest shadow-md bg-forest/5' : 'border-black/5 hover:shadow-md'
+                }`}>
+                  <div className="absolute top-4 left-4 z-10">
+                    <input 
+                      type="checkbox" 
+                      checked={selectedPages.includes(page.id!)}
+                      onChange={(e) => {
+                        if (e.target.checked) setSelectedPages([...selectedPages, page.id!]);
+                        else setSelectedPages(selectedPages.filter(id => id !== page.id));
+                      }}
+                      className="w-5 h-5 rounded border-gray-300 text-forest focus:ring-forest"
+                    />
+                  </div>
+                  <div className="flex justify-between items-start mb-4 pl-8">
                     <div className="p-3 bg-forest/5 text-forest rounded-2xl">
                       <FileText size={24} />
                     </div>
@@ -3264,51 +4554,118 @@ const Admin = () => {
             </div>
           ) : (
             <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
-              <table className="w-full text-left">
-                <thead className="bg-gray-50 border-b border-black/5">
-                  <tr>
-                    <th className="p-4 text-xs font-bold uppercase tracking-widest text-gray-400">Page Title</th>
-                    <th className="p-4 text-xs font-bold uppercase tracking-widest text-gray-400">Slug</th>
-                    <th className="p-4 text-xs font-bold uppercase tracking-widest text-gray-400">Status</th>
-                    <th className="p-4 text-xs font-bold uppercase tracking-widest text-gray-400">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-black/5">
-                  {pages.map(page => (
-                    <tr key={page.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="p-4 font-bold">{page.title}</td>
-                      <td className="p-4 text-gray-500">/{page.slug}</td>
-                      <td className="p-4">
-                        <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
-                          page.isPublished ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
-                        }`}>
-                          {page.isPublished ? 'Published' : 'Draft'}
-                        </span>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => {
-                              setEditingPage(page);
-                              setPageForm({ title: page.title, slug: page.slug, content: page.content, isPublished: page.isPublished });
-                              setIsPageModalOpen(true);
-                            }}
-                            className="p-2 text-forest hover:bg-forest/5 rounded-full"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeletePage(page.id!)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-full"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
+              <div className="p-4 border-b border-black/5">
+                <div className="relative w-full">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search pages..." 
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-gray-50 text-sm"
+                    value={pageSearch}
+                    onChange={(e) => {
+                      setPageSearch(e.target.value);
+                      setPagePage(1);
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-gray-50 z-10">
+                    <tr className="border-b border-black/5">
+                      <th className="p-4 w-10">
+                        <input 
+                          type="checkbox" 
+                          checked={selectedPages.length === pages.length && pages.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedPages(pages.map(p => p.id!));
+                            else setSelectedPages([]);
+                          }}
+                          className="rounded border-gray-300 text-forest focus:ring-forest"
+                        />
+                      </th>
+                      <th className="p-4 text-sm font-bold">Page Title</th>
+                      <th className="p-4 text-sm font-bold">Slug</th>
+                      <th className="p-4 text-sm font-bold">Status</th>
+                      <th className="p-4 text-sm font-bold">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-black/5">
+                    {pages
+                      .filter(p => 
+                        p.title.toLowerCase().includes(pageSearch.toLowerCase()) ||
+                        p.slug.toLowerCase().includes(pageSearch.toLowerCase())
+                      )
+                      .slice((pagePage - 1) * ITEMS_PER_PAGE, pagePage * ITEMS_PER_PAGE)
+                      .map(page => (
+                        <tr key={page.id} className={`hover:bg-gray-50 transition-colors ${selectedPages.includes(page.id!) ? 'bg-forest/5' : ''}`}>
+                          <td className="p-4">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedPages.includes(page.id!)}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedPages([...selectedPages, page.id!]);
+                                else setSelectedPages(selectedPages.filter(id => id !== page.id));
+                              }}
+                              className="rounded border-gray-300 text-forest focus:ring-forest"
+                            />
+                          </td>
+                          <td className="p-4 font-bold text-sm">{page.title}</td>
+                          <td className="p-4 text-gray-500 text-sm">/{page.slug}</td>
+                          <td className="p-4">
+                            <span className={`px-2 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest ${
+                              page.isPublished ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'
+                            }`}>
+                              {page.isPublished ? 'Published' : 'Draft'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => {
+                                  setEditingPage(page);
+                                  setPageForm({ title: page.title, slug: page.slug, content: page.content, isPublished: page.isPublished });
+                                  setIsPageModalOpen(true);
+                                }}
+                                className="p-2 text-forest hover:bg-forest/5 rounded-full transition-colors"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeletePage(page.id!)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination */}
+              <div className="p-4 border-t border-black/5 flex items-center justify-between bg-gray-50/50">
+                <span className="text-xs font-bold text-gray-400">
+                  Showing {Math.min(pages.length, (pagePage - 1) * ITEMS_PER_PAGE + 1)} to {Math.min(pages.length, pagePage * ITEMS_PER_PAGE)} of {pages.length}
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    disabled={pagePage === 1}
+                    onClick={() => setPagePage(prev => prev - 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                  >
+                    Previous
+                  </button>
+                  <button 
+                    disabled={pagePage * ITEMS_PER_PAGE >= pages.length}
+                    onClick={() => setPagePage(prev => prev + 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -3487,6 +4844,46 @@ const Admin = () => {
                 </select>
               </div>
             </div>
+
+            <div className="mt-8 pt-8 border-t border-black/5">
+              <div className="flex justify-between items-center mb-6">
+                <h4 className="text-lg font-bold flex items-center gap-2">
+                  <Youtube className="text-red-600" />
+                  YouTube Integration
+                </h4>
+                <button 
+                  onClick={syncYouTubeVideos}
+                  className="px-4 py-2 bg-red-600 text-white rounded-xl text-xs font-bold hover:bg-red-700 transition-all flex items-center gap-2"
+                >
+                  <Sparkles size={14} />
+                  Sync Now
+                </button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">YouTube Channel ID</label>
+                  <input 
+                    type="text" 
+                    value={currentTheme.options.youtubeChannelId || ''}
+                    onChange={(e) => setCurrentTheme(prev => ({ ...prev, options: { ...prev.options, youtubeChannelId: e.target.value } }))}
+                    className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-forest"
+                    placeholder="e.g. UC_x5XG1OV2P6uZZ5FSM9Ttw"
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Enter your YouTube Channel ID to automatically sync videos.</p>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">YouTube API Key</label>
+                  <input 
+                    type="password" 
+                    value={currentTheme.options.youtubeApiKey || ''}
+                    onChange={(e) => setCurrentTheme(prev => ({ ...prev, options: { ...prev.options, youtubeApiKey: e.target.value } }))}
+                    className="w-full p-3 bg-gray-50 rounded-xl border-none focus:ring-2 focus:ring-forest"
+                    placeholder="AIza..."
+                  />
+                  <p className="text-[10px] text-gray-400 mt-1">Required for fetching videos from your channel.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       ) : activeTab === 'users' ? (
@@ -3554,111 +4951,210 @@ const Admin = () => {
               </form>
             </section>
 
+            <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+              <h3 className="text-xl font-bold flex items-center gap-2">
+                <User className="text-forest" />
+                Manage Users & Access
+              </h3>
+              <div className="flex flex-wrap items-center gap-4">
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search users..." 
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-white"
+                    value={userSearch}
+                    onChange={(e) => {
+                      setUserSearch(e.target.value);
+                      setUserPage(1);
+                    }}
+                  />
+                </div>
+                {selectedUsers.length > 0 && (
+                  <div className="flex items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 animate-in fade-in slide-in-from-top-2">
+                    <span className="text-sm font-bold text-forest">{selectedUsers.length} Selected</span>
+                    <div className="h-4 w-[1px] bg-forest/20" />
+                    <select 
+                      onChange={(e) => handleBulkUpdateUserRole(e.target.value as UserRole)}
+                      className="bg-transparent text-xs font-bold text-forest outline-none cursor-pointer"
+                      value=""
+                    >
+                      <option value="" disabled>Update Role</option>
+                      <option value="client">Client</option>
+                      <option value="admin">Admin</option>
+                      <option value="super-admin">Super Admin</option>
+                    </select>
+                    <button 
+                      onClick={handleBulkDeleteUsers}
+                      className="text-xs font-bold text-red-500 hover:text-red-600 flex items-center gap-1"
+                    >
+                      <Trash2 size={14} /> Delete
+                    </button>
+                    <button 
+                      onClick={() => setSelectedUsers([])}
+                      className="text-xs font-bold opacity-40 hover:opacity-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
             <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-black/5">
-                    <th className="p-4 text-sm font-bold">User</th>
-                    <th className="p-4 text-sm font-bold">Role</th>
-                    <th className="p-4 text-sm font-bold">Admin Level</th>
-                    <th className="p-4 text-sm font-bold">Premium Access</th>
-                    <th className="p-4 text-sm font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.map((u) => (
-                    <tr key={u.uid} className="border-b border-black/5 hover:bg-gray-50 transition-colors">
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          {u.photoURL ? (
-                            <img src={u.photoURL} alt={u.displayName} className="w-8 h-8 rounded-full" />
-                          ) : (
-                            <div className="w-8 h-8 rounded-full bg-forest/10 flex items-center justify-center text-forest text-xs font-bold">
-                              {u.displayName.charAt(0)}
-                            </div>
-                          )}
-                          <div>
-                            <div className="font-bold text-sm">{u.displayName}</div>
-                            <div className="text-xs opacity-50">{u.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <select 
-                          value={u.role}
-                          onChange={(e) => handleUpdateUser(u.uid, { role: e.target.value as UserRole })}
-                          className="text-xs p-2 rounded-lg border border-gray-200 outline-none bg-white"
-                          disabled={u.uid === user?.uid}
-                        >
-                          <option value="client">Client</option>
-                          <option value="admin">Admin</option>
-                          <option value="super-admin">Super Admin</option>
-                        </select>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <input 
-                            type="number" 
-                            min="1" 
-                            max="5"
-                            value={u.adminLevel || ''}
-                            onChange={(e) => handleUpdateUser(u.uid, { adminLevel: Number(e.target.value) })}
-                            className="w-16 text-xs p-2 rounded-lg border border-gray-200 outline-none"
-                            placeholder="Level"
-                          />
-                          <input 
-                            type="text" 
-                            value={u.adminCategory || ''}
-                            onChange={(e) => handleUpdateUser(u.uid, { adminCategory: e.target.value })}
-                            className="text-xs p-2 rounded-lg border border-gray-200 outline-none"
-                            placeholder="Category"
-                          />
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input 
-                            type="checkbox" 
-                            className="sr-only peer"
-                            checked={u.hasPremiumAccess || false}
-                            onChange={(e) => handleUpdateUser(u.uid, { hasPremiumAccess: e.target.checked })}
-                          />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-forest"></div>
-                          <span className="ml-3 text-xs font-medium text-gray-500">
-                            {u.hasPremiumAccess ? 'Granted' : 'Revoked'}
-                          </span>
-                        </label>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => setSelectedUserForPermissions(u)}
-                            className="p-2 text-gold hover:bg-gold/5 rounded-full transition-colors"
-                            title="Manage Permissions"
-                          >
-                            <Shield size={18} />
-                          </button>
-                          <button 
-                            onClick={() => setSelectedUserForDetails(u)}
-                            className="p-2 text-forest hover:bg-forest/5 rounded-full transition-colors"
-                            title="View Details"
-                          >
-                            <User size={18} />
-                          </button>
-                          <button 
-                            onClick={() => setUserToDelete(u.uid)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                            title="Delete User Profile"
-                            disabled={u.uid === user?.uid}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-gray-50 z-10">
+                    <tr className="border-b border-black/5">
+                      <th className="p-4 w-10">
+                        <input 
+                          type="checkbox" 
+                          className="rounded border-gray-300 text-forest focus:ring-forest"
+                          checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedUsers(filteredUsers.map(u => u.uid));
+                            else setSelectedUsers([]);
+                          }}
+                        />
+                      </th>
+                      <th className="p-4 text-sm font-bold">User</th>
+                      <th className="p-4 text-sm font-bold">Role</th>
+                      <th className="p-4 text-sm font-bold">Admin Level</th>
+                      <th className="p-4 text-sm font-bold">Premium Access</th>
+                      <th className="p-4 text-sm font-bold">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-black/5">
+                    {filteredUsers
+                      .slice((userPage - 1) * ITEMS_PER_PAGE, userPage * ITEMS_PER_PAGE)
+                      .map((u) => (
+                        <tr key={u.uid} className={`hover:bg-gray-50 transition-colors ${selectedUsers.includes(u.uid) ? 'bg-forest/5' : ''}`}>
+                          <td className="p-4">
+                            <input 
+                              type="checkbox" 
+                              className="rounded border-gray-300 text-forest focus:ring-forest"
+                              checked={selectedUsers.includes(u.uid)}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedUsers([...selectedUsers, u.uid]);
+                                else setSelectedUsers(selectedUsers.filter(id => id !== u.uid));
+                              }}
+                              disabled={u.uid === user?.uid}
+                            />
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              {u.photoURL ? (
+                                <img src={u.photoURL} alt={u.displayName || 'User'} className="w-8 h-8 rounded-full" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-full bg-forest/10 flex items-center justify-center text-forest text-xs font-bold">
+                                  {u.displayName?.charAt(0) || 'U'}
+                                </div>
+                              )}
+                              <div>
+                                <div className="font-bold text-sm">{u.displayName || 'Anonymous'}</div>
+                                <div className="text-xs opacity-50">{u.email}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <select 
+                              value={u.role}
+                              onChange={(e) => handleUpdateUser(u.uid, { role: e.target.value as UserRole })}
+                              className="text-xs p-2 rounded-lg border border-gray-200 outline-none bg-white"
+                              disabled={u.uid === user?.uid}
+                            >
+                              <option value="client">Client</option>
+                              <option value="admin">Admin</option>
+                              <option value="super-admin">Super Admin</option>
+                            </select>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <input 
+                                type="number" 
+                                min="1" 
+                                max="5"
+                                value={u.adminLevel || ''}
+                                onChange={(e) => handleUpdateUser(u.uid, { adminLevel: Number(e.target.value) })}
+                                className="w-16 text-xs p-2 rounded-lg border border-gray-200 outline-none"
+                                placeholder="Level"
+                              />
+                              <input 
+                                type="text" 
+                                value={u.adminCategory || ''}
+                                onChange={(e) => handleUpdateUser(u.uid, { adminCategory: e.target.value })}
+                                className="text-xs p-2 rounded-lg border border-gray-200 outline-none"
+                                placeholder="Category"
+                              />
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <label className="relative inline-flex items-center cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                className="sr-only peer"
+                                checked={u.hasPremiumAccess || false}
+                                onChange={(e) => handleUpdateUser(u.uid, { hasPremiumAccess: e.target.checked })}
+                              />
+                              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-forest"></div>
+                              <span className="ml-3 text-xs font-medium text-gray-500">
+                                {u.hasPremiumAccess ? 'Granted' : 'Revoked'}
+                              </span>
+                            </label>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => setSelectedUserForPermissions(u)}
+                                className="p-2 text-gold hover:bg-gold/5 rounded-full transition-colors"
+                                title="Manage Permissions"
+                              >
+                                <Shield size={18} />
+                              </button>
+                              <button 
+                                onClick={() => setSelectedUserForDetails(u)}
+                                className="p-2 text-forest hover:bg-forest/5 rounded-full transition-colors"
+                                title="View Details"
+                              >
+                                <User size={18} />
+                              </button>
+                              <button 
+                                onClick={() => setUserToDelete(u.uid)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                                title="Delete Profile"
+                                disabled={u.uid === user?.uid}
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination */}
+              <div className="p-4 border-t border-black/5 flex items-center justify-between bg-gray-50/50">
+                <span className="text-xs font-bold text-gray-400">
+                  Showing {Math.min(filteredUsers.length, (userPage - 1) * ITEMS_PER_PAGE + 1)} to {Math.min(filteredUsers.length, userPage * ITEMS_PER_PAGE)} of {filteredUsers.length}
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    disabled={userPage === 1}
+                    onClick={() => setUserPage(prev => prev - 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                  >
+                    Previous
+                  </button>
+                  <button 
+                    disabled={userPage * ITEMS_PER_PAGE >= filteredUsers.length}
+                    onClick={() => setUserPage(prev => prev + 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           </section>
 
@@ -3990,53 +5486,136 @@ const Admin = () => {
           {/* Course & Lesson List */}
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-black/5">
-                    <th className="p-4 text-sm font-bold">Course</th>
-                    <th className="p-4 text-sm font-bold">Instructor</th>
-                    <th className="p-4 text-sm font-bold">Price</th>
-                    <th className="p-4 text-sm font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {courses.map((c) => (
-                    <tr key={c.id} className={`border-b border-black/5 hover:bg-gray-50 transition-colors ${selectedCourseForLessons?.id === c.id ? 'bg-forest/5' : ''}`}>
-                      <td className="p-4">
-                        <div className="font-bold text-sm">{c.title}</div>
-                        <div className="text-xs opacity-50 truncate max-w-[200px]">{c.description}</div>
-                      </td>
-                      <td className="p-4 text-sm">{c.instructor}</td>
-                      <td className="p-4 text-sm font-bold">{formatCurrency(c.price, currency)}</td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => setSelectedCourseForLessons(c)}
-                            className="p-2 text-gold hover:bg-gold/5 rounded-full"
-                            title="Manage Lessons"
-                          >
-                            <BookOpen size={18} />
-                          </button>
-                          <button 
-                            onClick={() => setEditingCourse(c)}
-                            className="p-2 text-forest hover:bg-forest/5 rounded-full"
-                            title="Edit"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button 
-                            onClick={() => courseService.deleteCourse(c.id!)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-full"
-                            title="Delete"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
+              <div className="p-4 border-b border-black/5 flex flex-wrap justify-between items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <h4 className="font-bold">Courses</h4>
+                  {selectedCourses.length > 0 && (
+                    <div className="flex items-center gap-2 bg-forest/10 px-3 py-1 rounded-full">
+                      <span className="text-xs font-bold text-forest">{selectedCourses.length} Selected</span>
+                      <button 
+                        onClick={handleBulkDeleteCourses}
+                        className="p-1 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                        title="Delete Selected"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search courses..." 
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-gray-50 text-sm"
+                    value={courseSearch}
+                    onChange={(e) => {
+                      setCourseSearch(e.target.value);
+                      setCoursePage(1);
+                    }}
+                  />
+                </div>
+              </div>
+              <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead className="sticky top-0 bg-gray-50 z-10">
+                    <tr className="border-b border-black/5">
+                      <th className="p-4 w-10">
+                        <input 
+                          type="checkbox" 
+                          className="rounded border-gray-300 text-forest focus:ring-forest"
+                          checked={selectedCourses.length === courses.length && courses.length > 0}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedCourses(courses.map(c => c.id!));
+                            else setSelectedCourses([]);
+                          }}
+                        />
+                      </th>
+                      <th className="p-4 text-sm font-bold">Course</th>
+                      <th className="p-4 text-sm font-bold">Instructor</th>
+                      <th className="p-4 text-sm font-bold">Price</th>
+                      <th className="p-4 text-sm font-bold">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-black/5">
+                    {courses
+                      .filter(c => 
+                        c.title.toLowerCase().includes(courseSearch.toLowerCase()) ||
+                        c.instructor.toLowerCase().includes(courseSearch.toLowerCase()) ||
+                        c.category.toLowerCase().includes(courseSearch.toLowerCase())
+                      )
+                      .slice((coursePage - 1) * ITEMS_PER_PAGE, coursePage * ITEMS_PER_PAGE)
+                      .map((c) => (
+                        <tr key={c.id} className={`hover:bg-gray-50 transition-colors ${selectedCourseForLessons?.id === c.id ? 'bg-forest/5' : ''} ${selectedCourses.includes(c.id!) ? 'bg-forest/5' : ''}`}>
+                          <td className="p-4">
+                            <input 
+                              type="checkbox" 
+                              className="rounded border-gray-300 text-forest focus:ring-forest"
+                              checked={selectedCourses.includes(c.id!)}
+                              onChange={(e) => {
+                                if (e.target.checked) setSelectedCourses([...selectedCourses, c.id!]);
+                                else setSelectedCourses(selectedCourses.filter(id => id !== c.id));
+                              }}
+                            />
+                          </td>
+                          <td className="p-4">
+                            <div className="font-bold text-sm">{c.title}</div>
+                            <div className="text-xs opacity-50 truncate max-w-[200px]">{c.description}</div>
+                          </td>
+                          <td className="p-4 text-sm">{c.instructor}</td>
+                          <td className="p-4 text-sm font-bold">{formatCurrency(c.price, currency)}</td>
+                          <td className="p-4">
+                            <div className="flex gap-2">
+                              <button 
+                                onClick={() => setSelectedCourseForLessons(c)}
+                                className={`p-2 rounded-full transition-colors ${selectedCourseForLessons?.id === c.id ? 'bg-forest text-white' : 'text-forest hover:bg-forest/5'}`}
+                                title="Manage Lessons"
+                              >
+                                <BookOpen size={16} />
+                              </button>
+                              <button 
+                                onClick={() => setEditingCourse(c)}
+                                className="p-2 text-forest hover:bg-forest/5 rounded-full transition-colors"
+                                title="Edit Course"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button 
+                                onClick={() => courseService.deleteCourse(c.id!)}
+                                className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                                title="Delete Course"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+              {/* Pagination */}
+              <div className="p-4 border-t border-black/5 flex items-center justify-between bg-gray-50/50">
+                <span className="text-xs font-bold text-gray-400">
+                  Showing {Math.min(courses.length, (coursePage - 1) * ITEMS_PER_PAGE + 1)} to {Math.min(courses.length, coursePage * ITEMS_PER_PAGE)} of {courses.length}
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    disabled={coursePage === 1}
+                    onClick={() => setCoursePage(prev => prev - 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                  >
+                    Previous
+                  </button>
+                  <button 
+                    disabled={coursePage * ITEMS_PER_PAGE >= courses.length}
+                    onClick={() => setCoursePage(prev => prev + 1)}
+                    className="p-2 rounded-lg border border-black/5 hover:bg-white disabled:opacity-30 transition-all text-xs font-bold"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
 
             {selectedCourseForLessons && (
@@ -4094,278 +5673,457 @@ const Admin = () => {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Add/Edit Product Form */}
-          <div className="lg:col-span-1">
-            <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm sticky top-24">
-              <div className="flex justify-between items-center mb-6">
-                <h3 className="text-xl font-bold flex items-center gap-2">
-                  {editingProduct ? <Edit2 className="text-forest" /> : <Plus className="text-forest" />}
-                  {editingProduct ? 'Edit Product' : 'Add New Product'}
-                </h3>
-                <div className="flex gap-2">
-                  {!editingProduct && (
-                    <button 
-                      onClick={async () => {
-                        showConfirm(
-                          "Seed Products",
-                          "This will add Jagunlabi Bitters and other initial products if they don't exist. Continue?",
-                          async () => {
-                            await seedService.seedProducts();
-                            showToast("Seeding complete!", "success");
-                          }
-                        );
-                      }}
-                      className="text-[10px] bg-gold/10 text-gold px-2 py-1 rounded-lg font-bold hover:bg-gold/20 transition-all"
-                    >
-                      Seed Initial Data
-                    </button>
-                  )}
-                  {editingProduct && (
-                    <button 
-                      onClick={() => setEditingProduct(null)}
-                      className="text-xs text-red-500 hover:underline"
-                    >
-                      Cancel Edit
-                    </button>
-                  )}
-                </div>
-              </div>
-              <form onSubmit={handleSubmitProduct} className="space-y-4">
-                <input 
-                  type="text" 
-                  placeholder="Product Name" 
-                  value={productForm.name}
-                  onChange={e => setProductForm({...productForm, name: e.target.value})}
-                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                  required
-                />
-                <textarea 
-                  placeholder="Description" 
-                  value={productForm.description}
-                  onChange={e => setProductForm({...productForm, description: e.target.value})}
-                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                  rows={3}
-                  required
-                />
-                <div className="grid grid-cols-2 gap-4">
-                  <input 
-                    type="number" 
-                    placeholder={`Price (${CURRENCIES[currency].symbol})`} 
-                    value={productForm.price || ''}
-                    onChange={e => setProductForm({...productForm, price: Number(e.target.value)})}
-                    className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                    required
-                  />
-                  <input 
-                    type="number" 
-                    placeholder="Stock" 
-                    value={productForm.stock || ''}
-                    onChange={e => setProductForm({...productForm, stock: Number(e.target.value)})}
-                    className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                    required
-                  />
-                </div>
-                <input 
-                  type="text" 
-                  placeholder="Category" 
-                  value={productForm.category}
-                  onChange={e => setProductForm({...productForm, category: e.target.value})}
-                  className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-                  required
-                />
-                
-                <div className="space-y-2">
-                  <label className="text-sm font-bold text-gray-500 flex items-center gap-2">
-                    <Upload size={14} />
-                    Product Image
-                  </label>
-                  <div className="flex gap-4 items-center">
-                    <div className="relative flex-grow">
-                      <input 
-                        type="text" 
-                        placeholder="Image URL" 
-                        value={productForm.imageUrl}
-                        onChange={e => setProductForm({...productForm, imageUrl: e.target.value})}
-                        className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest pr-12"
-                      />
-                      {productForm.imageUrl && (
-                        <img 
-                          src={productForm.imageUrl} 
-                          className="absolute right-2 top-2 w-8 h-8 rounded object-cover border border-gray-200"
-                          referrerPolicy="no-referrer"
-                        />
-                      )}
-                    </div>
-                    <label className={`cursor-pointer p-3 rounded-xl border border-dashed border-gray-300 hover:border-forest hover:bg-forest/5 transition-all flex items-center justify-center ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                      {isUploading ? <Loader2 className="animate-spin text-forest" /> : <Plus className="text-forest" />}
-                      <input 
-                        type="file" 
-                        className="hidden" 
-                        accept="image/*"
-                        onChange={handleImageUpload}
-                        disabled={isUploading}
-                      />
-                    </label>
-                  </div>
-                  <p className="text-[10px] text-gray-400 italic">Upload a file or paste a URL directly.</p>
-                </div>
-
-                <div className="flex items-center gap-2 py-2">
-                  <input 
-                    type="checkbox" 
-                    id="featured"
-                    checked={productForm.featured}
-                    onChange={e => setProductForm({...productForm, featured: e.target.checked})}
-                    className="w-4 h-4 text-forest focus:ring-forest border-gray-300 rounded"
-                  />
-                  <label htmlFor="featured" className="text-sm font-bold text-gray-700 cursor-pointer">
-                    Featured Product
-                  </label>
-                </div>
-
-                <button 
-                  type="submit" 
-                  disabled={isUploading}
-                  className={`w-full py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                >
-                  {editingProduct ? 'Update Product' : 'Save Product'}
-                </button>
-              </form>
-            </div>
-          </div>
-
-          {/* Product List */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
-              <div className="p-4 border-b border-black/5 flex justify-between items-center">
-                <div className="flex items-center gap-4">
-                  <h4 className="font-bold">Products</h4>
-                  {selectedProducts.length > 0 && (
-                    <div className="flex items-center gap-2 bg-forest/10 px-3 py-1 rounded-full">
-                      <span className="text-xs font-bold text-forest">{selectedProducts.length} Selected</span>
-                      <button 
-                        onClick={handleBulkDeleteProducts}
-                        className="p-1 text-red-500 hover:bg-red-50 rounded-full transition-colors"
-                        title="Delete Selected"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-black/5">
-                    <th className="p-4 w-10">
-                      <input 
-                        type="checkbox" 
-                        className="rounded border-gray-300 text-forest focus:ring-forest"
-                        checked={selectedProducts.length === products.length && products.length > 0}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedProducts(products.map(p => p.id!));
-                          } else {
-                            setSelectedProducts([]);
-                          }
-                        }}
-                      />
-                    </th>
-                    <th className="p-4 text-sm font-bold">Product</th>
-                    <th className="p-4 text-sm font-bold">Price</th>
-                    <th className="p-4 text-sm font-bold">Stock</th>
-                    <th className="p-4 text-sm font-bold">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((p) => (
-                    <tr key={p.id} className={`border-b border-black/5 hover:bg-gray-50 transition-colors ${selectedProducts.includes(p.id!) ? 'bg-forest/5' : ''}`}>
-                      <td className="p-4">
-                        <input 
-                          type="checkbox" 
-                          className="rounded border-gray-300 text-forest focus:ring-forest"
-                          checked={selectedProducts.includes(p.id!)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedProducts(prev => [...prev, p.id!]);
-                            } else {
-                              setSelectedProducts(prev => prev.filter(id => id !== p.id));
-                            }
-                          }}
-                        />
-                      </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <img 
-                            src={p.imageUrl || `https://picsum.photos/seed/${p.name}/50/50`} 
-                            className="w-10 h-10 rounded-lg object-cover"
-                            referrerPolicy="no-referrer"
-                          />
-                          <div>
-                            <div className="font-bold text-sm flex items-center gap-2">
-                              {p.name}
-                              {p.featured && <Star size={12} className="text-gold fill-gold" />}
-                            </div>
-                            <div className="text-xs opacity-50">{p.category}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-4 text-sm font-bold">{formatCurrency(p.price, currency)}</td>
-                      <td className="p-4 text-sm">{p.stock}</td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <button 
-                            onClick={() => setEditingProduct(p)}
-                            className="p-2 text-forest hover:bg-forest/5 rounded-full"
-                            title="Edit"
-                          >
-                            <Edit2 size={18} />
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteProduct(p.id!)}
-                            className="p-2 text-red-500 hover:bg-red-50 rounded-full"
-                            title="Delete"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {hasMoreProducts && (
-                <div className="p-4 border-t border-black/5 flex justify-center">
-                  <button 
-                    onClick={() => fetchAdminProducts()}
-                    disabled={isLoadingProducts}
-                    className="text-xs font-bold text-forest hover:underline flex items-center gap-2"
-                  >
-                    {isLoadingProducts ? <Loader2 className="animate-spin" size={14} /> : <Plus size={14} />}
-                    Load More Products
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
+        <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+          <LayoutDashboard size={48} className="mb-4 opacity-20" />
+          <p className="font-bold">Select a tab to manage your sanctuary</p>
+          <button onClick={() => setActiveTab('dashboard')} className="mt-4 text-forest font-bold hover:underline">Go to Dashboard</button>
         </div>
       )}
-
+        </main>
+      </div>
+      
       {/* Hidden Printable Area */}
       {printingConsultation && <PrintableConsultation consultation={printingConsultation} />}
-      </div>
+
+      {/* Page Modal */}
+      <AnimatePresence>
+        {isPageModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]"
+            >
+              <div className="p-6 border-b border-black/5 flex justify-between items-center bg-forest text-white">
+                <h3 className="text-xl font-bold">{editingPage ? 'Edit Page' : 'Create New Page'}</h3>
+                <button onClick={() => setIsPageModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+              <form onSubmit={handleSavePage} className="flex-grow overflow-y-auto p-8 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Page Title</label>
+                    <input 
+                      type="text" 
+                      value={pageForm.title}
+                      onChange={e => setPageForm({...pageForm, title: e.target.value})}
+                      className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                      placeholder="e.g. About Us"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">URL Slug</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">/</span>
+                      <input 
+                        type="text" 
+                        value={pageForm.slug}
+                        onChange={e => setPageForm({...pageForm, slug: e.target.value})}
+                        className="w-full pl-8 pr-4 py-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                        placeholder="about-us"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Content (Markdown Supported)</label>
+                  <textarea 
+                    value={pageForm.content}
+                    onChange={e => setPageForm({...pageForm, content: e.target.value})}
+                    className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest font-mono text-sm"
+                    rows={12}
+                    placeholder="# Welcome to our page..."
+                    required
+                  />
+                </div>
+                <div className="flex items-center gap-3">
+                  <input 
+                    type="checkbox" 
+                    id="isPublished"
+                    checked={pageForm.isPublished}
+                    onChange={e => setPageForm({...pageForm, isPublished: e.target.checked})}
+                    className="w-5 h-5 rounded border-gray-300 text-forest focus:ring-forest"
+                  />
+                  <label htmlFor="isPublished" className="text-sm font-bold text-gray-700">Publish this page immediately</label>
+                </div>
+                <div className="pt-6 border-t border-black/5 flex justify-end gap-4">
+                  <button 
+                    type="button"
+                    onClick={() => setIsPageModalOpen(false)}
+                    className="px-8 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    className="px-8 py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all shadow-lg shadow-forest/20"
+                  >
+                    {editingPage ? 'Update Page' : 'Create Page'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Task Modal */}
+      <AnimatePresence>
+        {isTaskModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl"
+            >
+              <div className="p-6 border-b border-black/5 flex justify-between items-center bg-forest text-white">
+                <h3 className="text-xl font-bold">{editingTask ? 'Edit Task' : 'New Task'}</h3>
+                <button onClick={() => setIsTaskModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+              <form onSubmit={handleSaveTask} className="p-8 space-y-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Task Title</label>
+                  <input 
+                    type="text" 
+                    value={taskForm.title}
+                    onChange={e => setTaskForm({...taskForm, title: e.target.value})}
+                    className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                    placeholder="e.g. Restock Jagunlabi Bitters"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Description</label>
+                  <textarea 
+                    value={taskForm.description}
+                    onChange={e => setTaskForm({...taskForm, description: e.target.value})}
+                    className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                    rows={3}
+                    placeholder="Details about the task..."
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Priority</label>
+                    <select 
+                      value={taskForm.priority}
+                      onChange={e => setTaskForm({...taskForm, priority: e.target.value as TaskPriority})}
+                      className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest font-bold"
+                    >
+                      <option value={TaskPriority.LOW}>Low</option>
+                      <option value={TaskPriority.MEDIUM}>Medium</option>
+                      <option value={TaskPriority.HIGH}>High</option>
+                      <option value={TaskPriority.URGENT}>Urgent</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Status</label>
+                    <select 
+                      value={taskForm.status}
+                      onChange={e => setTaskForm({...taskForm, status: e.target.value as TaskStatus})}
+                      className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest font-bold"
+                    >
+                      <option value={TaskStatus.TODO}>To Do</option>
+                      <option value={TaskStatus.IN_PROGRESS}>In Progress</option>
+                      <option value={TaskStatus.COMPLETED}>Completed</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Due Date</label>
+                    <input 
+                      type="date" 
+                      value={taskForm.dueDate}
+                      onChange={e => setTaskForm({...taskForm, dueDate: e.target.value})}
+                      className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="pt-6 border-t border-black/5 flex justify-end gap-4">
+                  <button 
+                    type="button"
+                    onClick={() => setIsTaskModalOpen(false)}
+                    className="px-8 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    className="px-8 py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all shadow-lg shadow-forest/20"
+                  >
+                    {editingTask ? 'Update Task' : 'Create Task'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Product Modal */}
+      <AnimatePresence>
+        {isProductModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl"
+            >
+              <div className="p-6 border-b border-black/5 flex justify-between items-center bg-forest text-white">
+                <h3 className="text-xl font-bold">{editingProduct ? 'Edit Product' : 'New Product'}</h3>
+                <button onClick={() => setIsProductModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+              <form onSubmit={handleSubmitProduct} className="p-8 space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Product Name</label>
+                    <input 
+                      type="text" 
+                      value={productForm.name}
+                      onChange={e => setProductForm({...productForm, name: e.target.value})}
+                      className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                      placeholder="e.g. Jagunlabi Bitters"
+                      required
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Description</label>
+                    <textarea 
+                      value={productForm.description}
+                      onChange={e => setProductForm({...productForm, description: e.target.value})}
+                      className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                      rows={3}
+                      placeholder="Product details..."
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Price ({CURRENCIES[currency].symbol})</label>
+                    <input 
+                      type="number" 
+                      value={productForm.price || ''}
+                      onChange={e => setProductForm({...productForm, price: Number(e.target.value)})}
+                      className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Stock</label>
+                    <input 
+                      type="number" 
+                      value={productForm.stock || ''}
+                      onChange={e => setProductForm({...productForm, stock: Number(e.target.value)})}
+                      className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Category</label>
+                    <input 
+                      type="text" 
+                      value={productForm.category}
+                      onChange={e => setProductForm({...productForm, category: e.target.value})}
+                      className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                      placeholder="e.g. Bitters"
+                      required
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 pt-8">
+                    <input 
+                      type="checkbox" 
+                      id="featured"
+                      checked={productForm.featured}
+                      onChange={e => setProductForm({...productForm, featured: e.target.checked})}
+                      className="w-5 h-5 rounded border-gray-300 text-forest focus:ring-forest"
+                    />
+                    <label htmlFor="featured" className="text-sm font-bold text-gray-700">Featured Product</label>
+                  </div>
+                </div>
+                <div className="pt-6 border-t border-black/5 flex justify-end gap-4">
+                  <button 
+                    type="button"
+                    onClick={() => setIsProductModalOpen(false)}
+                    className="px-8 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    className="px-8 py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all shadow-lg shadow-forest/20"
+                  >
+                    {editingProduct ? 'Update Product' : 'Create Product'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Media Viewer Modal */}
+      <AnimatePresence>
+        {isMediaModalOpen && selectedMedia && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-5xl aspect-video relative flex items-center justify-center"
+            >
+              <button 
+                onClick={() => setIsMediaModalOpen(false)} 
+                className="absolute -top-12 right-0 p-2 text-white hover:bg-white/10 rounded-full transition-colors"
+              >
+                <X size={32} />
+              </button>
+              {selectedMedia.type === 'image' ? (
+                <img 
+                  src={selectedMedia.url} 
+                  alt={selectedMedia.name} 
+                  className="max-w-full max-h-full object-contain shadow-2xl" 
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <ReactPlayer 
+                  url={selectedMedia.url} 
+                  width="100%" 
+                  height="100%" 
+                  controls 
+                  playing
+                />
+              )}
+              <div className="absolute -bottom-12 left-0 right-0 text-center text-white">
+                <p className="text-lg font-bold">{selectedMedia.name}</p>
+                <button 
+                  onClick={() => {
+                    navigator.clipboard.writeText(selectedMedia.url);
+                    showToast("URL copied!", "success");
+                  }}
+                  className="text-xs opacity-60 hover:opacity-100 transition-opacity"
+                >
+                  Copy URL: {selectedMedia.url}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Video Modal */}
+      <AnimatePresence>
+        {isVideoModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-2xl"
+            >
+              <div className="p-6 border-b border-black/5 flex justify-between items-center bg-forest text-white">
+                <h3 className="text-xl font-bold">{editingVideo ? 'Edit Video' : 'New Video'}</h3>
+                <button onClick={() => setIsVideoModalOpen(false)} className="p-2 hover:bg-white/10 rounded-full transition-colors">
+                  <X size={24} />
+                </button>
+              </div>
+              <form onSubmit={handleSubmitVideo} className="p-8 space-y-6">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Video Title</label>
+                  <input 
+                    type="text" 
+                    value={videoForm.title}
+                    onChange={e => setVideoForm({...videoForm, title: e.target.value})}
+                    className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                    placeholder="e.g. Introduction to Ifá"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Description</label>
+                  <textarea 
+                    value={videoForm.description}
+                    onChange={e => setVideoForm({...videoForm, description: e.target.value})}
+                    className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                    rows={3}
+                    placeholder="Video details..."
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">YouTube Video ID</label>
+                    <input 
+                      type="text" 
+                      value={videoForm.youtubeId}
+                      onChange={e => setVideoForm({...videoForm, youtubeId: e.target.value})}
+                      className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                      placeholder="e.g. dQw4w9WgXcQ"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Required Access Level</label>
+                    <select 
+                      value={videoForm.requiredLevel}
+                      onChange={e => setVideoForm({...videoForm, requiredLevel: Number(e.target.value)})}
+                      className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest font-bold"
+                    >
+                      <option value={0}>Public (Everyone)</option>
+                      <option value={1}>Clients (Logged In)</option>
+                      <option value={2}>Admins Only</option>
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Thumbnail URL (Optional)</label>
+                  <input 
+                    type="text" 
+                    value={videoForm.thumbnailUrl}
+                    onChange={e => setVideoForm({...videoForm, thumbnailUrl: e.target.value})}
+                    className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
+                    placeholder="https://..."
+                  />
+                </div>
+                <div className="pt-6 border-t border-black/5 flex justify-end gap-4">
+                  <button 
+                    type="button"
+                    onClick={() => setIsVideoModalOpen(false)}
+                    className="px-8 py-3 rounded-xl font-bold text-gray-500 hover:bg-gray-100 transition-all"
+                  >
+                    Cancel
+                  </button>
+                  <button 
+                    type="submit"
+                    className="px-8 py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all shadow-lg shadow-forest/20"
+                  >
+                    {editingVideo ? 'Update Video' : 'Save Video'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
 
 const Training = () => {
   const { showToast } = useToast();
+  const { user, userProfile } = useAuth();
   const [courses, setCourses] = useState<Course[]>([]);
   const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
-  const [user, setUser] = useState(auth.currentUser);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [completions, setCompletions] = useState<string[]>([]);
   const [isEnrolling, setIsEnrolling] = useState(false);
@@ -4375,16 +6133,14 @@ const Training = () => {
   const categories = ['All', ...new Set(courses.map(c => c.category || 'General'))];
 
   useEffect(() => {
-    const unsubscribeAuth = onAuthStateChanged(auth, (u) => setUser(u));
     const unsubscribeCourses = courseService.subscribeToCourses(setCourses);
     
     let unsubscribeEnrollments = () => {};
-    if (auth.currentUser) {
-      unsubscribeEnrollments = courseService.subscribeToEnrollments(auth.currentUser.uid, setEnrollments);
+    if (user) {
+      unsubscribeEnrollments = courseService.subscribeToEnrollments(user.uid, setEnrollments);
     }
 
     return () => {
-      unsubscribeAuth();
       unsubscribeCourses();
       unsubscribeEnrollments();
     };
@@ -4532,7 +6288,9 @@ const Training = () => {
 
   if (selectedCourse) {
     const enrolled = isEnrolled(selectedCourse.id!);
-    const progress = lessons.length > 0 ? (completions.length / lessons.length) * 100 : 0;
+    const completedLessonsCount = lessons.filter(l => completions.includes(l.id!)).length;
+    const progress = lessons.length > 0 ? (completedLessonsCount / lessons.length) * 100 : 0;
+    const nextLesson = lessons.find(l => !completions.includes(l.id!));
 
     return (
       <div className="max-w-6xl mx-auto p-8">
@@ -4556,17 +6314,24 @@ const Training = () => {
                 <p className="text-sm opacity-80 mb-6">{selectedCourse.description}</p>
                 
                 {enrolled && (
-                  <div className="mb-6">
-                    <div className="flex justify-between text-xs font-bold mb-2">
-                      <span>Course Progress</span>
-                      <span>{Math.round(progress)}%</span>
+                  <div className="mb-6 p-4 bg-forest/5 rounded-2xl border border-forest/10">
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="flex items-center gap-2">
+                        <Award className="text-forest" size={16} />
+                        <span className="text-xs font-bold uppercase tracking-wider text-forest">Your Progress</span>
+                      </div>
+                      <span className="text-xs font-bold text-forest">{Math.round(progress)}%</span>
                     </div>
-                    <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-forest transition-all duration-500" 
-                        style={{ width: `${progress}%` }}
+                    <div className="w-full h-2 bg-forest/10 rounded-full overflow-hidden mb-2">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        className="h-full bg-forest" 
                       />
                     </div>
+                    <p className="text-[10px] font-medium opacity-60 text-center">
+                      {completedLessonsCount} of {lessons.length} lessons completed
+                    </p>
                   </div>
                 )}
 
@@ -4579,15 +6344,35 @@ const Training = () => {
                     {isEnrolling ? "Enrolling..." : "Enroll in Course"}
                   </button>
                 ) : (
-                  <div className="p-3 bg-forest/10 text-forest rounded-xl text-center font-bold text-sm">
-                    You are enrolled
+                  <div className="space-y-3">
+                    <div className="p-3 bg-forest/10 text-forest rounded-xl text-center font-bold text-sm flex items-center justify-center gap-2">
+                      <CheckCircle2 size={16} />
+                      Enrolled
+                    </div>
+                    {nextLesson && (
+                      <button 
+                        onClick={() => setActiveLesson(nextLesson)}
+                        className="w-full py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Play size={16} />
+                        {completedLessonsCount === 0 ? "Start Learning" : "Continue Learning"}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
             </div>
           </div>
           <div className="lg:col-span-2">
-            <h2 className="text-2xl font-bold mb-6">Course Lessons</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">Course Lessons</h2>
+              {enrolled && (
+                <div className="flex items-center gap-2 text-sm font-medium opacity-60">
+                  <Clock size={16} />
+                  <span>{lessons.length} Lessons</span>
+                </div>
+              )}
+            </div>
             <div className="space-y-4">
               {!enrolled ? (
                 <div className="p-12 bg-white rounded-3xl border border-black/5 text-center">
@@ -4610,19 +6395,35 @@ const Training = () => {
                     <button 
                       key={lesson.id}
                       onClick={() => setActiveLesson(lesson)}
-                      className={`w-full flex items-center gap-4 p-6 bg-white rounded-2xl border border-black/5 hover:border-gold hover:shadow-md transition-all text-left group ${!hasAccess ? 'opacity-75' : ''}`}
+                      className={`w-full flex items-center gap-4 p-6 bg-white rounded-2xl border transition-all text-left group ${
+                        completed 
+                          ? 'border-green-100 bg-green-50/10' 
+                          : 'border-black/5 hover:border-gold hover:shadow-md'
+                      } ${!hasAccess ? 'opacity-75' : ''}`}
                     >
                       <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold transition-colors ${
                         completed ? 'bg-green-100 text-green-700' : !hasAccess ? 'bg-gray-100 text-gray-400' : 'bg-forest/10 text-forest'
                       }`}>
-                        {completed ? <Sparkles size={18} /> : !hasAccess ? <Lock size={16} /> : idx + 1}
+                        {completed ? <CheckCircle2 size={20} /> : !hasAccess ? <Lock size={16} /> : idx + 1}
                       </div>
                       <div className="flex-grow">
-                        <h3 className="font-bold group-hover:text-gold transition-colors">{lesson.title}</h3>
+                        <h3 className={`font-bold transition-colors ${completed ? 'text-green-800' : 'group-hover:text-gold'}`}>
+                          {lesson.title}
+                        </h3>
                         <p className="text-xs opacity-50">Lesson {idx + 1} {lesson.requiredLevel && lesson.requiredLevel > 0 && `• ${lesson.requiredLevel === 2 ? 'Admin' : 'Client'} Only`}</p>
                       </div>
-                      {completed && <span className="text-[10px] font-bold text-green-600 uppercase tracking-widest">Completed</span>}
-                      {!hasAccess && <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Locked</span>}
+                      {completed && (
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-green-100 text-green-700 rounded-full">
+                          <CheckCircle2 size={12} />
+                          <span className="text-[10px] font-bold uppercase tracking-widest">Completed</span>
+                        </div>
+                      )}
+                      {!hasAccess && (
+                        <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-100 text-gray-500 rounded-full">
+                          <Lock size={12} />
+                          <span className="text-[10px] font-bold uppercase tracking-widest">Locked</span>
+                        </div>
+                      )}
                     </button>
                   );
                 })
@@ -4875,6 +6676,15 @@ const Consultation = () => {
         scheduledAt,
         questions
       });
+
+      // Notify admins
+      await notificationService.sendToAllAdmins({
+        type: 'booking',
+        title: 'New Consultation Booking',
+        message: `A new ${type} consultation has been booked for ${scheduledAt}.`,
+        link: '/admin'
+      });
+
       setScheduledAt('');
       setQuestions('');
       showToast("Consultation booked successfully!", "success");
@@ -5400,12 +7210,14 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const { currency, setCurrency } = useCurrency();
+  const { userProfile } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [showAdminPrompt, setShowAdminPrompt] = useState(false);
   const [currentTheme, setCurrentTheme] = useState<ThemeSettings | null>(null);
   const [pages, setPages] = useState<Page[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   useEffect(() => {
     const unsubscribe = themeService.subscribeToTheme(setCurrentTheme);
@@ -5436,34 +7248,40 @@ export default function App() {
     if (userProfile?.role === 'admin' || userProfile?.role === 'super-admin') {
       seedService.seedProducts();
       seedService.seedPages();
+      seedService.seedFaqs();
+      seedService.seedBabalawos();
+      seedService.seedVideos();
+      seedService.seedCourses();
     }
   }, [userProfile]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
-        const profile = await authService.ensureUserProfile(user);
-        setUserProfile(profile);
-        
-        // If admin/super-admin, show prompt if not already in admin mode
-        if (profile.role === 'admin' || profile.role === 'super-admin') {
-          if (location.pathname === '/') {
-            setShowAdminPrompt(true);
-          }
-        } else {
-          // Regular users redirect to home or dashboard if they were on admin
-          if (location.pathname.startsWith('/admin')) {
-            navigate('/');
-          }
+    if (userProfile) {
+      // If admin/super-admin, show prompt if not already in admin mode
+      if (userProfile.role === 'admin' || userProfile.role === 'super-admin') {
+        if (location.pathname === '/' && !isAdminMode) {
+          setShowAdminPrompt(true);
         }
       } else {
-        setUserProfile(null);
-        setIsAdminMode(false);
-        setShowAdminPrompt(false);
+        // Regular users redirect to home or dashboard if they were on admin
+        if (location.pathname.startsWith('/admin')) {
+          navigate('/');
+        }
       }
-    });
-    return unsubscribe;
-  }, [navigate, location.pathname]);
+    } else {
+      setIsAdminMode(false);
+      setShowAdminPrompt(false);
+    }
+  }, [userProfile, navigate, location.pathname, isAdminMode]);
+
+  useEffect(() => {
+    if (userProfile?.uid) {
+      const unsubscribe = notificationService.subscribeToUserNotifications(userProfile.uid, setNotifications);
+      return unsubscribe;
+    }
+  }, [userProfile]);
+
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   const handleAdminChoice = (asAdmin: boolean) => {
     setIsAdminMode(asAdmin);
@@ -5556,6 +7374,75 @@ export default function App() {
               </div>
 
               <div className="h-6 w-[1px] bg-black/10 mx-2" />
+              
+              {userProfile && (
+                <div className="relative mr-2">
+                  <button 
+                    onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                    className="p-2.5 rounded-xl hover:bg-gray-100 transition-all relative"
+                  >
+                    {unreadCount > 0 ? <BellRing className="text-gold" size={20} /> : <Bell size={20} />}
+                    {unreadCount > 0 && (
+                      <span className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full border-2 border-white" />
+                    )}
+                  </button>
+                  
+                  <AnimatePresence>
+                    {isNotificationsOpen && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-2xl border border-black/5 z-[60] overflow-hidden"
+                      >
+                        <div className="p-4 border-b border-black/5 flex justify-between items-center bg-gray-50/50">
+                          <h3 className="font-bold text-sm">Notifications</h3>
+                          {unreadCount > 0 && (
+                            <button 
+                              onClick={() => notificationService.markAllAsRead(userProfile!.uid)}
+                              className="text-[10px] font-bold uppercase tracking-widest text-forest hover:underline"
+                            >
+                              Mark all as read
+                            </button>
+                          )}
+                        </div>
+                        <div className="max-h-[400px] overflow-y-auto custom-scrollbar">
+                          {notifications.length === 0 ? (
+                            <div className="p-8 text-center">
+                              <Bell className="w-8 h-8 mx-auto mb-2 opacity-20" />
+                              <p className="text-xs opacity-40">No notifications yet</p>
+                            </div>
+                          ) : (
+                            notifications.map(n => (
+                              <div 
+                                key={n.id}
+                                onClick={() => {
+                                  if (!n.read) notificationService.markAsRead(n.id!);
+                                  if (n.link) navigate(n.link);
+                                  setIsNotificationsOpen(false);
+                                }}
+                                className={`p-4 border-b border-black/5 hover:bg-gray-50 cursor-pointer transition-colors ${!n.read ? 'bg-forest/5' : ''}`}
+                              >
+                                <div className="flex gap-3">
+                                  <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${!n.read ? 'bg-forest' : 'bg-transparent'}`} />
+                                  <div>
+                                    <p className="text-sm font-bold leading-tight mb-1">{n.title}</p>
+                                    <p className="text-xs opacity-60 leading-relaxed">{n.message}</p>
+                                    <p className="text-[10px] opacity-40 mt-2">
+                                      {n.createdAt?.seconds ? new Date(n.createdAt.seconds * 1000).toLocaleDateString() : 'Just now'}
+                                    </p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
+
               <Auth />
               {(userProfile?.role === 'admin' || userProfile?.role === 'super-admin') && (
                 <button 

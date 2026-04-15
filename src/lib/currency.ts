@@ -26,7 +26,8 @@ export const formatCurrency = (amount: number, currency: Currency = 'NGN') => {
 
 export const getCurrencyFromLocation = async (): Promise<Currency> => {
   try {
-    const response = await fetch('https://ipapi.co/json/');
+    const response = await fetch('https://ipapi.co/json/', { signal: AbortSignal.timeout(3000) });
+    if (!response.ok) throw new Error('Network response was not ok');
     const data = await response.json();
     const countryCode = data.country_code;
     
@@ -36,8 +37,8 @@ export const getCurrencyFromLocation = async (): Promise<Currency> => {
     if (['DE', 'FR', 'IT', 'ES', 'NL', 'BE'].includes(countryCode)) return 'EUR';
     
     return 'NGN'; // Default to Naira
-  } catch (error) {
-    console.error('Error fetching location:', error);
+  } catch {
+    // Silently fail and return default currency to avoid console noise in restricted environments
     return 'NGN';
   }
 };

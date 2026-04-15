@@ -25,6 +25,9 @@ export interface Product {
   imageUrl: string;
   stock: number;
   featured?: boolean;
+  features?: string[];
+  specifications?: Record<string, string>;
+  usageInstructions?: string;
   createdAt: string;
 }
 

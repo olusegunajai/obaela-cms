@@ -18,6 +18,8 @@ export interface ThemeSettings {
   borderRadius: string;
   glassOpacity: string;
   sidebarStyle: 'light' | 'dark' | 'glass';
+  youtubeChannelId?: string;
+  youtubeApiKey?: string;
 }
 
 const DEFAULT_THEME: ThemeSettings = {
@@ -96,7 +98,9 @@ export const themeService = {
             fontFamily: { type: Type.STRING },
             borderRadius: { type: Type.STRING },
             glassOpacity: { type: Type.STRING },
-            sidebarStyle: { type: Type.STRING, enum: ['light', 'dark', 'glass'] }
+            sidebarStyle: { type: Type.STRING, enum: ['light', 'dark', 'glass'] },
+            youtubeChannelId: { type: Type.STRING },
+            youtubeApiKey: { type: Type.STRING }
           },
           required: ["primaryColor", "secondaryColor", "accentColor", "backgroundColor", "textColor", "fontFamily", "borderRadius", "glassOpacity", "sidebarStyle"]
         }
