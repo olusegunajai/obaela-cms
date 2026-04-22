@@ -1,12 +1,77 @@
-import { collection, getDocs, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, addDoc, serverTimestamp, doc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../firebase';
 import { Product } from './productService';
 import { Page } from './pageService';
+import { SiteSettings } from './settingsService';
 
 const COLLECTION_NAME = 'products';
 const PAGES_COLLECTION = 'pages';
 
 export const seedService = {
+  async seedAll() {
+    console.log('Starting full database seed...');
+    try {
+      console.log('Seeding settings...');
+      await this.seedSettings();
+      console.log('Seeding pages...');
+      await this.seedPages();
+      console.log('Seeding products...');
+      await this.seedProducts();
+      console.log('Seeding FAQs...');
+      await this.seedFaqs();
+      console.log('Seeding babalawos...');
+      await this.seedBabalawos();
+      console.log('Seeding videos...');
+      await this.seedVideos();
+      console.log('Seeding courses...');
+      await this.seedCourses();
+      console.log('Full database seed completed.');
+    } catch (error) {
+      console.error('Seed process failed at some step:', error);
+      throw error;
+    }
+  },
+
+  async seedSettings() {
+    const docRef = doc(db, 'settings', 'site_settings');
+    const docSnap = await getDoc(docRef);
+    
+    if (!docSnap.exists()) {
+      const initialSettings: SiteSettings = {
+        siteName: 'OBA ELA',
+        siteTagline: 'Trado Medical',
+        logoUrl: '',
+        faviconUrl: '',
+        footerText: '© 2026 OBA ELA TRADO MEDICAL HEALING LIMITED. All rights reserved.',
+        contactEmail: 'contact@obaela.com',
+        contactPhone: '+234 800 OBA ELA',
+        contactAddress: 'Sacred Temple, Earth',
+        socialLinks: {
+          facebook: 'https://facebook.com/obaela',
+          instagram: 'https://instagram.com/obaela',
+          twitter: 'https://twitter.com/obaela',
+          youtube: 'https://youtube.com/obaela',
+          whatsapp: 'https://wa.me/2348000000000'
+        },
+        maintenanceMode: false,
+        ecommerce: {
+          defaultCurrency: 'NGN',
+          taxRate: 0,
+          shippingFee: 2000,
+          consultationPrice: 15000,
+          paystackPublicKey: 'pk_test_placeholder'
+        },
+        appearance: {
+          primaryColor: '#1a3c34',
+          accentColor: '#d4af37',
+          fontFamily: 'serif'
+        }
+      };
+      await setDoc(docRef, initialSettings);
+      console.log('Site settings seeded.');
+    }
+  },
+
   async seedPages() {
     const pagesRef = collection(db, PAGES_COLLECTION);
     const q = await getDocs(pagesRef);

@@ -44,7 +44,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, query, orderBy, onSnapshot, doc, setDoc, serverTimestamp, QueryDocumentSnapshot } from 'firebase/firestore';
 import { productService, Product } from './services/productService';
 import { uploadImage, uploadVideo } from './services/cloudinaryService';
-import { ShoppingCart, Plus, Trash2, Edit2, Upload, Loader2, Printer, MessageCircle, Send, X as CloseIcon, Play, Facebook, Instagram, Twitter, Star, Eye } from 'lucide-react';
+import { ShoppingCart, Plus, Trash2, Edit2, Upload, Loader2, Printer, MessageCircle, Send, X as CloseIcon, Play, Facebook, Instagram, Twitter, Star, Eye, History } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { orderService, OrderStatus, Order } from './services/orderService';
 import { courseService, Course, Lesson, Enrollment } from './services/courseService';
@@ -56,134 +56,19 @@ import { seedService } from './services/seedService';
 import { pageService, Page } from './services/pageService';
 import { taskService, Task, TaskPriority, TaskStatus } from './services/taskService';
 import { themeService, ThemeSettings } from './services/themeService';
+import { settingsService, SiteSettings } from './services/settingsService';
 import { themes, Theme } from './themes';
-import { reviewService, Review } from './services/reviewService';
 import { faqService, FAQ } from './services/faqService';
 import { notificationService, Notification } from './services/notificationService';
 import { useToast } from './components/Toast';
 import { useConfirm } from './components/Confirm';
 import { ProductReviews } from './components/ProductReviews';
-import { CONSULTATION_PRICE } from './constants';
 import { useCurrency } from './contexts/CurrencyContext';
 import { useAuth } from './contexts/AuthContext';
+import { useSettings } from './contexts/SettingsContext';
 import { formatCurrency, CURRENCIES, Currency } from './lib/currency';
 
 // Components
-const ProductReviews = ({ productId, productName, onClose }: { productId: string, productName: string, onClose: () => void }) => {
-  const { showToast } = useToast();
-  const [reviews, setReviews] = useState<Review[]>([]);
-  const [rating, setRating] = useState(5);
-  const [text, setText] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    const unsubscribe = reviewService.subscribeToReviews(productId, setReviews);
-    return unsubscribe;
-  }, [productId]);
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!auth.currentUser) {
-      showToast("Please sign in to leave a review.", "error");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await reviewService.addReview(productId, {
-        userId: auth.currentUser.uid,
-        userName: auth.currentUser.displayName || "Anonymous",
-        rating,
-        text
-      });
-      setText('');
-      setRating(5);
-      showToast("Review submitted successfully!", "success");
-    } catch (error) {
-      console.error(error);
-      showToast("Failed to submit review.", "error");
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <div className="bg-white rounded-[2rem] p-8 max-w-2xl w-full max-h-[90vh] overflow-y-auto relative shadow-2xl">
-      <button onClick={onClose} className="absolute top-6 right-6 p-2 hover:bg-gray-100 rounded-full">
-        <X />
-      </button>
-      
-      <h2 className="text-3xl font-bold mb-2 serif">{productName}</h2>
-      <p className="text-gold uppercase tracking-[0.2em] text-xs font-bold mb-8 serif italic">Customer Reviews</p>
-
-      {/* Review Form */}
-      {auth.currentUser ? (
-        <form onSubmit={handleSubmit} className="mb-12 bg-paper p-6 rounded-2xl border border-black/5">
-          <h3 className="text-lg font-bold mb-4">Leave a Review</h3>
-          <div className="flex gap-2 mb-4">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button
-                key={star}
-                type="button"
-                onClick={() => setRating(star)}
-                className={`p-1 transition-colors ${star <= rating ? 'text-gold' : 'text-gray-300'}`}
-              >
-                <Star size={24} fill={star <= rating ? "currentColor" : "none"} />
-              </button>
-            ))}
-          </div>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Share your experience with this product..."
-            className="w-full p-4 rounded-xl border border-black/10 outline-none focus:ring-2 focus:ring-forest mb-4 min-h-[100px]"
-            required
-          />
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="w-full py-3 bg-forest text-white rounded-xl font-bold hover:bg-gold hover:text-black transition-all disabled:opacity-50"
-          >
-            {isSubmitting ? "Submitting..." : "Submit Review"}
-          </button>
-        </form>
-      ) : (
-        <div className="mb-12 p-6 bg-paper rounded-2xl border border-black/5 text-center italic opacity-60">
-          Please sign in to leave a review.
-        </div>
-      )}
-
-      {/* Reviews List */}
-      <div className="space-y-8">
-        {reviews.length === 0 ? (
-          <p className="text-center opacity-50 italic py-8">No reviews yet. Be the first to review!</p>
-        ) : (
-          reviews.map((review) => (
-            <div key={review.id} className="border-b border-black/5 pb-8 last:border-0">
-              <div className="flex justify-between items-start mb-2">
-                <div className="font-bold">{review.userName}</div>
-                <div className="flex gap-1">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      size={12}
-                      className={star <= review.rating ? 'text-gold fill-gold' : 'text-gray-300'}
-                    />
-                  ))}
-                </div>
-              </div>
-              <p className="text-sm opacity-70 leading-relaxed mb-2">{review.text}</p>
-              <div className="text-[10px] opacity-40 uppercase tracking-widest">
-                {review.createdAt?.toDate ? review.createdAt.toDate().toLocaleDateString() : 'Just now'}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
-};
-
 const CustomPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const [page, setPage] = useState<Page | null>(null);
@@ -294,10 +179,14 @@ const Home = () => {
           <span className="text-gold uppercase tracking-[0.4em] text-sm font-semibold mb-6 block serif italic">Sacred Wisdom & Traditional Healing</span>
           <h1 className="text-6xl md:text-8xl font-light text-white serif mb-8 leading-tight tracking-tight">
             {homePage?.title ? (
-              <>
-                {homePage.title.split('TRADO')[0]} <br />
-                <span className="text-gold italic font-medium">TRADO {homePage.title.split('TRADO')[1]}</span>
-              </>
+              homePage.title.includes('TRADO') ? (
+                <>
+                  {homePage.title.split('TRADO')[0]} <br />
+                  <span className="text-gold italic font-medium">TRADO {homePage.title.split('TRADO')[1]}</span>
+                </>
+              ) : (
+                homePage.title
+              )
             ) : (
               <>
                 OBA ELA <br />
@@ -613,17 +502,6 @@ const Store = () => {
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [selectedProductForReviews, setSelectedProductForReviews] = useState<Product | null>(null);
   const observer = useRef<IntersectionObserver | null>(null);
-  const lastProductElementRef = useCallback((node: HTMLDivElement | null) => {
-    if (isLoading) return;
-    if (observer.current) observer.current.disconnect();
-    observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) {
-        fetchProducts();
-      }
-    });
-    if (node) observer.current.observe(node);
-  }, [isLoading, hasMore, fetchProducts]);
-
   const PAGE_SIZE = 8;
 
   const fetchProducts = useCallback(async (isFirstLoad = false, category = selectedCategory, featured = showFeaturedOnly) => {
@@ -653,6 +531,17 @@ const Store = () => {
       setIsLoading(false);
     }
   }, [isLoading, hasMore, lastVisible, selectedCategory, showFeaturedOnly, showToast]);
+
+  const lastProductElementRef = useCallback((node: HTMLDivElement | null) => {
+    if (isLoading) return;
+    if (observer.current) observer.current.disconnect();
+    observer.current = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore) {
+        fetchProducts();
+      }
+    });
+    if (node) observer.current.observe(node);
+  }, [isLoading, hasMore, fetchProducts]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -1034,8 +923,7 @@ const Store = () => {
               className="relative z-10 w-full flex justify-center"
             >
               <ProductReviews 
-                productId={selectedProductForReviews.id!} 
-                productName={selectedProductForReviews.name}
+                product={selectedProductForReviews} 
                 onClose={() => setSelectedProductForReviews(null)}
               />
             </motion.div>
@@ -1045,27 +933,33 @@ const Store = () => {
     </div>
   );
 };
-const Checkout = ({ total, onComplete, onCancel }: { cart: {product: Product, quantity: number}[], total: number, onComplete: (ref: string, details: { name: string, email: string, phone: string, address: string }) => void, onCancel: () => void }) => {
+const Checkout = ({ total, onComplete, onCancel }: { cart: {product: Product, quantity: number}[], total: number, onComplete: (ref: string, details: { name: string, email: string, phone: string, address: string, totalAmount: number }) => void, onCancel: () => void }) => {
   const { currency } = useCurrency();
   const { showToast } = useToast();
+  const { settings } = useSettings();
   const [email, setEmail] = useState(auth.currentUser?.email || '');
   const [name, setName] = useState(auth.currentUser?.displayName || '');
   const [phone, setPhone] = useState('');
   const [address, setAddress] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
+  const shippingFee = settings?.ecommerce?.shippingFee || 0;
+  const taxRate = settings?.ecommerce?.taxRate || 0;
+  const taxAmount = (total * taxRate) / 100;
+  const finalTotal = total + shippingFee + taxAmount;
+
   const config = {
     reference: (new Date()).getTime().toString(),
     email: email,
-    amount: total * 100, // Paystack amount is in kobo
-    publicKey: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '',
-    currency: 'NGN',
+    amount: Math.round(finalTotal * 100), // Paystack amount is in kobo
+    publicKey: settings?.ecommerce?.paystackPublicKey || import.meta.env.VITE_PAYSTACK_PUBLIC_KEY || '',
+    currency: settings?.ecommerce?.defaultCurrency || 'NGN',
   };
 
   const initializePayment = usePaystackPayment(config);
 
   const handlePaystackSuccessAction = (reference: { reference: string }) => {
-    onComplete(reference.reference, { name, email, phone, address });
+    onComplete(reference.reference, { name, email, phone, address, totalAmount: finalTotal });
   };
 
   const handlePaystackCloseAction = () => {
@@ -1075,7 +969,7 @@ const Checkout = ({ total, onComplete, onCancel }: { cart: {product: Product, qu
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!config.publicKey) {
-      showToast("Paystack Public Key is missing. Please check environment variables.", "error");
+      showToast("Paystack Public Key is missing in sanctuary settings.", "error");
       return;
     }
     setIsProcessing(true);
@@ -1086,72 +980,94 @@ const Checkout = ({ total, onComplete, onCancel }: { cart: {product: Product, qu
   };
 
   return (
-    <div className="bg-white p-8 rounded-3xl max-w-lg w-full shadow-2xl">
-      <h2 className="text-2xl font-bold mb-6 flex items-center gap-2">
-        <CreditCard className="text-forest" />
-        Checkout Details
+    <div className="bg-white p-10 rounded-[3rem] max-w-lg w-full shadow-2xl border border-black/5">
+      <h2 className="text-3xl font-bold mb-8 flex items-center gap-3 serif">
+        <div className="w-10 h-10 bg-forest/10 rounded-xl flex items-center justify-center">
+          <CreditCard className="text-forest" size={24} />
+        </div>
+        Sacred Checkout
       </h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="grid grid-cols-1 gap-4">
-          <input 
-            type="text" 
-            placeholder="Full Name" 
-            value={name}
-            onChange={e => setName(e.target.value)}
-            className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-            required
-          />
-          <input 
-            type="email" 
-            placeholder="Email Address" 
-            value={email}
-            onChange={e => setEmail(e.target.value)}
-            className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-            required
-          />
-          <input 
-            type="tel" 
-            placeholder="Phone Number" 
-            value={phone}
-            onChange={e => setPhone(e.target.value)}
-            className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-            required
-          />
-          <textarea 
-            placeholder="Delivery Address" 
-            value={address}
-            onChange={e => setAddress(e.target.value)}
-            className="w-full p-3 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-forest"
-            rows={3}
-            required
-          />
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Full Name</label>
+            <input 
+              type="text" 
+              value={name}
+              onChange={e => setName(e.target.value)}
+              className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Email Address</label>
+            <input 
+              type="email" 
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Phone Number</label>
+            <input 
+              type="tel" 
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Delivery Address</label>
+            <textarea 
+              value={address}
+              onChange={e => setAddress(e.target.value)}
+              className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+              rows={3}
+              required
+            />
+          </div>
         </div>
 
-        <div className="bg-gray-50 p-4 rounded-2xl mb-6">
-          <div className="flex justify-between items-center mb-2">
+        <div className="bg-paper p-6 rounded-3xl space-y-3">
+          <div className="flex justify-between items-center text-sm">
             <span className="opacity-60">Subtotal</span>
             <span className="font-bold">{formatCurrency(total, currency)}</span>
           </div>
-          <div className="flex justify-between items-center text-forest">
-            <span className="font-bold">Total to Pay</span>
-            <span className="text-xl font-bold">{formatCurrency(total, currency)}</span>
+          {shippingFee > 0 && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="opacity-60">Shipping</span>
+              <span className="font-bold">{formatCurrency(shippingFee, currency)}</span>
+            </div>
+          )}
+          {taxAmount > 0 && (
+            <div className="flex justify-between items-center text-sm">
+              <span className="opacity-60">Tax ({taxRate}%)</span>
+              <span className="font-bold">{formatCurrency(taxAmount, currency)}</span>
+            </div>
+          )}
+          <div className="pt-3 border-t border-black/5 flex justify-between items-center text-forest">
+            <span className="font-bold text-lg">Total</span>
+            <span className="text-2xl font-bold">{formatCurrency(finalTotal, currency)}</span>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
+        <div className="flex flex-col sm:flex-row gap-4 pt-4">
           <button 
             type="button"
             onClick={onCancel}
-            className="flex-1 py-4 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-all text-center"
+            className="flex-1 py-4 bg-gray-100 rounded-2xl font-bold hover:bg-gray-200 transition-all text-center"
           >
             Cancel
           </button>
           <button 
             type="submit"
             disabled={isProcessing}
-            className="flex-1 py-4 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-forest/10"
+            className="flex-1 py-4 bg-forest text-white rounded-2xl font-bold hover:bg-opacity-90 transition-all flex items-center justify-center gap-2 shadow-xl shadow-forest/20 disabled:opacity-50"
           >
-            {isProcessing ? <Loader2 className="animate-spin" /> : 'Pay with Paystack'}
+            {isProcessing ? <Loader2 className="animate-spin" /> : 'Confirm Order'}
           </button>
         </div>
       </form>
@@ -1251,11 +1167,12 @@ const Orders = () => {
   );
 };
 const Admin = () => {
+  const { getConsultationPrice } = useSettings();
   const { currency } = useCurrency();
   const { showToast } = useToast();
   const { showConfirm } = useConfirm();
   const { user, userProfile } = useAuth();
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'consultations' | 'products' | 'orders' | 'users' | 'courses' | 'babalawos' | 'videos' | 'staff' | 'accounting' | 'pages' | 'theme' | 'faqs' | 'media' | 'tasks'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'consultations' | 'products' | 'orders' | 'users' | 'courses' | 'babalawos' | 'videos' | 'staff' | 'accounting' | 'pages' | 'theme' | 'faqs' | 'media' | 'tasks' | 'settings'>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [allConsultations, setAllConsultations] = useState<ConsultationData[]>([]);
@@ -1322,6 +1239,28 @@ const Admin = () => {
   const [selectedCourseForLessons, setSelectedCourseForLessons] = useState<Course | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [printingConsultation, setPrintingConsultation] = useState<ConsultationData | null>(null);
+  const [settings, setSettings] = useState<SiteSettings | null>(null);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const s = await settingsService.getSettings();
+      setSettings(s);
+    };
+    fetchSettings();
+  }, []);
+
+  const handleUpdateSettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (settings) {
+      try {
+        await settingsService.updateSettings(settings);
+        showToast("Site settings updated successfully!", "success");
+      } catch (error) {
+        console.error(error);
+        showToast("Failed to update site settings", "error");
+      }
+    }
+  };
 
   const handlePrint = (consultation: ConsultationData) => {
     setPrintingConsultation(consultation);
@@ -2279,6 +2218,11 @@ const Admin = () => {
         setProductForm(prev => ({ ...prev, imageUrl: url }));
       } else if (activeTab === 'healers') {
         setHealerForm(prev => ({ ...prev, imageUrl: url }));
+      } else if (activeTab === 'settings') {
+        // We'll handle this through a specific parameter or state check if needed
+        // But for now let's just make it generic if we pass a field name
+        showToast("Image uploaded! Don't forget to save settings.", "info");
+        return url;
       }
       showToast("Image uploaded successfully!", "success");
     } catch (error) {
@@ -2321,6 +2265,7 @@ const Admin = () => {
     { id: 'tasks', label: 'Tasks', icon: CheckSquare, roles: ['admin', 'super-admin'] },
     { id: 'pages', label: 'Pages', icon: FileText, roles: ['super-admin'] },
     { id: 'theme', label: 'Theme AI', icon: Sparkles, roles: ['super-admin'] },
+    { id: 'settings', label: 'Site Settings', icon: Shield, roles: ['super-admin'] },
     { id: 'users', label: 'Users', icon: Shield, roles: ['super-admin'] },
   ];
 
@@ -4420,7 +4365,7 @@ const Admin = () => {
               <h4 className="text-2xl font-bold text-forest">
                 {formatCurrency(
                   allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0) +
-                  allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? CONSULTATION_PRICE : 0), 0),
+                  allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? getConsultationPrice() : 0), 0),
                   currency
                 )}
               </h4>
@@ -4434,7 +4379,7 @@ const Admin = () => {
             <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
               <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">Consultation Revenue</p>
               <h4 className="text-2xl font-bold text-forest">
-                {formatCurrency(allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? CONSULTATION_PRICE : 0), 0), currency)}
+                {formatCurrency(allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? getConsultationPrice() : 0), 0), currency)}
               </h4>
             </div>
             <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm">
@@ -4464,7 +4409,7 @@ const Admin = () => {
                       </div>
                       <div className="text-right">
                         <p className="text-sm font-bold text-forest">
-                          {formatCurrency(('totalAmount' in t ? t.totalAmount : CONSULTATION_PRICE), currency)}
+                          {formatCurrency(('totalAmount' in t ? t.totalAmount : getConsultationPrice()), currency)}
                         </p>
                         <p className={`text-[10px] font-bold uppercase ${
                           t.status === 'cancelled' ? 'text-red-500' : 'text-green-500'
@@ -4492,19 +4437,19 @@ const Admin = () => {
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-forest" 
-                      style={{ width: `${(allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0) / (allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0) + allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? CONSULTATION_PRICE : 0), 0)) * 100) || 0}%` }}
+                      style={{ width: `${(allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0) / (allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0) + allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? getConsultationPrice() : 0), 0)) * 100) || 0}%` }}
                     />
                   </div>
                 </div>
                 <div>
                   <div className="flex justify-between text-sm mb-2">
                     <span>Consultations</span>
-                    <span className="font-bold">{formatCurrency(allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? CONSULTATION_PRICE : 0), 0), currency)}</span>
+                    <span className="font-bold">{formatCurrency(allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? getConsultationPrice() : 0), 0), currency)}</span>
                   </div>
                   <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
                     <div 
                       className="h-full bg-gold" 
-                      style={{ width: `${(allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? CONSULTATION_PRICE : 0), 0) / (allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0) + allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? CONSULTATION_PRICE : 0), 0)) * 100) || 0}%` }}
+                      style={{ width: `${(allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? getConsultationPrice() : 0), 0) / (allOrders.reduce((sum, o) => sum + (o.status !== 'cancelled' ? o.totalAmount : 0), 0) + allConsultations.reduce((sum, c) => sum + (c.status === 'completed' ? getConsultationPrice() : 0), 0)) * 100) || 0}%` }}
                     />
                   </div>
                 </div>
@@ -5729,6 +5674,278 @@ const Admin = () => {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : activeTab === 'settings' ? (
+        <div className="max-w-4xl mx-auto pb-20">
+          <div className="bg-white rounded-[2rem] border border-black/5 shadow-sm overflow-hidden">
+            <div className="p-8 bg-forest text-white flex justify-between items-center">
+              <div>
+                <h3 className="text-2xl font-bold serif">Site Settings</h3>
+                <p className="text-white/70 text-sm">Configure your spiritual sanctuary's identity and global parameters.</p>
+              </div>
+              {settings?.maintenanceMode && (
+                <div className="bg-red-500 text-white px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest animate-pulse">
+                  Maintenance Mode Active
+                </div>
+              )}
+            </div>
+            {settings ? (
+              <form onSubmit={handleUpdateSettings} className="p-8 space-y-12">
+                {/* General Branding */}
+                <div className="space-y-6">
+                  <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-gold border-b border-black/5 pb-2">Branding & Identity</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Site Name</label>
+                        <input 
+                          type="text" 
+                          value={settings.siteName}
+                          onChange={e => setSettings({...settings, siteName: e.target.value})}
+                          className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Site Tagline</label>
+                        <input 
+                          type="text" 
+                          value={settings.siteTagline}
+                          onChange={e => setSettings({...settings, siteTagline: e.target.value})}
+                          className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+                          required
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2 text-center">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Site Logo</label>
+                        <div className="relative group aspect-square rounded-2xl bg-gray-50 border border-dashed border-black/10 flex flex-col items-center justify-center overflow-hidden">
+                          {settings.logoUrl ? (
+                            <img src={settings.logoUrl} className="w-full h-full object-contain p-4" referrerPolicy="no-referrer" />
+                          ) : (
+                            <Leaf size={32} className="text-gray-200" />
+                          )}
+                          <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white text-[10px] font-bold uppercase">
+                            Upload
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const url = await handleImageUpload(e);
+                                if (url) setSettings({...settings, logoUrl: url});
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                      <div className="space-y-2 text-center">
+                        <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400">Favicon</label>
+                        <div className="relative group aspect-square rounded-2xl bg-gray-50 border border-dashed border-black/10 flex flex-col items-center justify-center overflow-hidden">
+                          {settings.faviconUrl ? (
+                            <img src={settings.faviconUrl} className="w-8 h-8 object-contain" referrerPolicy="no-referrer" />
+                          ) : (
+                            <Sparkles size={24} className="text-gray-200" />
+                          )}
+                          <label className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center cursor-pointer text-white text-[10px] font-bold uppercase">
+                            Upload
+                            <input 
+                              type="file" 
+                              className="hidden" 
+                              accept="image/*"
+                              onChange={async (e) => {
+                                const url = await handleImageUpload(e);
+                                if (url) setSettings({...settings, faviconUrl: url});
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ecommerce Settings */}
+                <div className="space-y-6 pt-4">
+                  <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-gold border-b border-black/5 pb-2">Store & Business</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Consultation Price</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">{CURRENCIES[settings.ecommerce?.defaultCurrency || 'NGN']?.symbol}</span>
+                        <input 
+                          type="number" 
+                          value={settings.ecommerce?.consultationPrice || 0}
+                          onChange={e => setSettings({...settings, ecommerce: {...settings.ecommerce!, consultationPrice: Number(e.target.value)}})}
+                          className="w-full pl-10 pr-4 py-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Shipping Fee</label>
+                      <input 
+                        type="number" 
+                        value={settings.ecommerce?.shippingFee || 0}
+                        onChange={e => setSettings({...settings, ecommerce: {...settings.ecommerce!, shippingFee: Number(e.target.value)}})}
+                        className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Tax Rate (%)</label>
+                      <input 
+                        type="number" 
+                        value={settings.ecommerce?.taxRate || 0}
+                        onChange={e => setSettings({...settings, ecommerce: {...settings.ecommerce!, taxRate: Number(e.target.value)}})}
+                        className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Paystack Public Key</label>
+                    <input 
+                      type="password" 
+                      value={settings.ecommerce?.paystackPublicKey || ''}
+                      onChange={e => setSettings({...settings, ecommerce: {...settings.ecommerce!, paystackPublicKey: e.target.value}})}
+                      className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+                      placeholder="pk_test_..."
+                    />
+                  </div>
+                </div>
+
+                {/* Contact Information */}
+                <div className="space-y-6 pt-4">
+                  <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-gold border-b border-black/5 pb-2">Global Contact</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Contact Email</label>
+                      <input 
+                        type="email" 
+                        value={settings.contactEmail}
+                        onChange={e => setSettings({...settings, contactEmail: e.target.value})}
+                        className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Contact Phone</label>
+                      <input 
+                        type="text" 
+                        value={settings.contactPhone}
+                        onChange={e => setSettings({...settings, contactPhone: e.target.value})}
+                        className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Physical Address</label>
+                    <textarea 
+                      value={settings.contactAddress}
+                      onChange={e => setSettings({...settings, contactAddress: e.target.value})}
+                      className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+                      rows={2}
+                    />
+                  </div>
+                </div>
+
+                {/* Footer and Social */}
+                <div className="space-y-6 pt-4">
+                  <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-gold border-b border-black/5 pb-2">Footer & Social</h4>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-gray-400 px-1">Footer Text</label>
+                    <textarea 
+                      value={settings.footerText}
+                      onChange={e => setSettings({...settings, footerText: e.target.value})}
+                      className="w-full p-4 rounded-2xl bg-gray-50 border border-black/5 outline-none focus:ring-2 focus:ring-forest transition-all"
+                      rows={2}
+                      required
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4">
+                    <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-black/5">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm">
+                        <Facebook size={20} />
+                      </div>
+                      <input 
+                        type="url" 
+                        placeholder="Facebook URL"
+                        value={settings.socialLinks.facebook || ''}
+                        onChange={e => setSettings({...settings, socialLinks: {...settings.socialLinks, facebook: e.target.value}})}
+                        className="flex-grow bg-transparent outline-none text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-black/5">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-pink-600 shadow-sm">
+                        <Instagram size={20} />
+                      </div>
+                      <input 
+                        type="url" 
+                        placeholder="Instagram URL"
+                        value={settings.socialLinks.instagram || ''}
+                        onChange={e => setSettings({...settings, socialLinks: {...settings.socialLinks, instagram: e.target.value}})}
+                        className="flex-grow bg-transparent outline-none text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-black/5">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-400 shadow-sm">
+                        <Twitter size={20} />
+                      </div>
+                      <input 
+                        type="url" 
+                        placeholder="Twitter URL"
+                        value={settings.socialLinks.twitter || ''}
+                        onChange={e => setSettings({...settings, socialLinks: {...settings.socialLinks, twitter: e.target.value}})}
+                        className="flex-grow bg-transparent outline-none text-sm"
+                      />
+                    </div>
+                    <div className="flex items-center gap-3 bg-gray-50 p-2 rounded-2xl border border-black/5">
+                      <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-green-500 shadow-sm">
+                        <MessageCircle size={20} />
+                      </div>
+                      <input 
+                        type="url" 
+                        placeholder="WhatsApp Link"
+                        value={settings.socialLinks.whatsapp || ''}
+                        onChange={e => setSettings({...settings, socialLinks: {...settings.socialLinks, whatsapp: e.target.value}})}
+                        className="flex-grow bg-transparent outline-none text-sm"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Advanced */}
+                <div className="space-y-6 pt-4">
+                  <h4 className="text-sm font-bold uppercase tracking-[0.2em] text-red-500 border-b border-black/5 pb-2">System Controls</h4>
+                  <div className="flex items-center justify-between p-6 bg-red-50 rounded-[2rem] border border-red-100">
+                    <div>
+                      <h5 className="font-bold text-red-900">Maintenance Mode</h5>
+                      <p className="text-xs text-red-700 opacity-70">When active, only administrators can access the site. Public visitors will see a notice.</p>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => setSettings({...settings, maintenanceMode: !settings.maintenanceMode})}
+                      className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${settings.maintenanceMode ? 'bg-red-500' : 'bg-gray-200'}`}
+                    >
+                      <span className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${settings.maintenanceMode ? 'translate-x-7' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-12">
+                  <button 
+                    type="submit" 
+                    className="w-full py-5 bg-forest text-white rounded-[2rem] font-bold hover:bg-opacity-90 transition-all shadow-2xl shadow-forest/40 flex items-center justify-center gap-3 text-lg"
+                  >
+                    <Check size={24} />
+                    Update Sanctuary Configuration
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <div className="p-20 text-center text-gray-400 italic">
+                Gathering site intelligence...
               </div>
             )}
           </div>
@@ -7282,6 +7499,7 @@ export default function App() {
   const location = useLocation();
   const { currency, setCurrency } = useCurrency();
   const { userProfile } = useAuth();
+  const { settings, loading: settingsLoading } = useSettings();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isAdminMode, setIsAdminMode] = useState(false);
   const [showAdminPrompt, setShowAdminPrompt] = useState(false);
@@ -7316,14 +7534,16 @@ export default function App() {
 
   useEffect(() => {
     authService.testConnection();
-    if (userProfile?.role === 'admin' || userProfile?.role === 'super-admin') {
-      seedService.seedProducts();
-      seedService.seedPages();
-      seedService.seedFaqs();
-      seedService.seedBabalawos();
-      seedService.seedVideos();
-      seedService.seedCourses();
-    }
+    const initApp = async () => {
+      if (userProfile?.role === 'admin' || userProfile?.role === 'super-admin') {
+        try {
+          await seedService.seedAll();
+        } catch (error) {
+          console.error("Seeding error:", error);
+        }
+      }
+    };
+    initApp();
   }, [userProfile]);
 
   useEffect(() => {
@@ -7331,7 +7551,7 @@ export default function App() {
       // If admin/super-admin, show prompt if not already in admin mode
       if (userProfile.role === 'admin' || userProfile.role === 'super-admin') {
         if (location.pathname === '/' && !isAdminMode) {
-          setShowAdminPrompt(true);
+          setTimeout(() => setShowAdminPrompt(true), 0);
         }
       } else {
         // Regular users redirect to home or dashboard if they were on admin
@@ -7340,10 +7560,14 @@ export default function App() {
         }
       }
     } else {
-      setIsAdminMode(false);
-      setShowAdminPrompt(false);
+      if (isAdminMode || showAdminPrompt) {
+        setTimeout(() => {
+          setIsAdminMode(false);
+          setShowAdminPrompt(false);
+        }, 0);
+      }
     }
-  }, [userProfile, navigate, location.pathname, isAdminMode]);
+  }, [userProfile, navigate, location.pathname, isAdminMode, showAdminPrompt]);
 
   useEffect(() => {
     if (userProfile?.uid) {
@@ -7351,6 +7575,21 @@ export default function App() {
       return unsubscribe;
     }
   }, [userProfile]);
+
+  useEffect(() => {
+    if (settings?.faviconUrl) {
+      let link = document.querySelector("link[rel~='icon']") as HTMLLinkElement;
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.getElementsByTagName('head')[0].appendChild(link);
+      }
+      link.href = settings.faviconUrl;
+    }
+    if (settings?.siteName) {
+      document.title = `${settings.siteName} | ${settings.siteTagline}`;
+    }
+  }, [settings]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -7361,6 +7600,42 @@ export default function App() {
       navigate('/admin');
     }
   };
+
+  if (settingsLoading) {
+    return (
+      <div className="min-h-screen bg-[#0a0502] flex items-center justify-center p-6 text-center">
+        <Loader2 className="animate-spin text-gold w-12 h-12" />
+      </div>
+    );
+  }
+
+  // Maintenance Mode Guard
+  if (settings?.maintenanceMode && userProfile?.role !== 'admin' && userProfile?.role !== 'super-admin') {
+    return (
+      <div className="min-h-screen bg-[#0a0502] flex items-center justify-center p-6 text-center">
+        <motion.div 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="max-w-md w-full"
+        >
+          <div className="w-24 h-24 bg-gold/10 rounded-full flex items-center justify-center mx-auto mb-8 animate-pulse">
+            <Shield className="text-gold w-12 h-12" />
+          </div>
+          <h1 className="text-4xl md:text-5xl text-white serif mb-6 tracking-tight">Sacred Maintenance</h1>
+          <p className="text-white/60 text-lg mb-10 leading-relaxed">
+            The sanctuary is currently undergoing spiritual purification and technical upgrades. Please return shortly.
+          </p>
+          <div className="p-6 bg-white/5 rounded-3xl border border-white/10 backdrop-blur-sm">
+            <p className="text-gold font-bold mb-2">Are you an administrator?</p>
+            <Auth />
+          </div>
+          <div className="mt-12 text-white/30 text-xs uppercase tracking-[0.2em]">
+            © {new Date().getFullYear()} {settings.siteName}
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -7406,12 +7681,16 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-20 items-center">
             <Link to="/" className="flex items-center gap-3 group">
-              <div className="w-10 h-10 bg-forest rounded-xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-500">
-                <Leaf className="text-white w-6 h-6" />
-              </div>
+              {settings?.logoUrl ? (
+                <img src={settings.logoUrl} alt={settings.siteName} className="h-12 w-auto object-contain" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="w-10 h-10 bg-forest rounded-xl flex items-center justify-center group-hover:rotate-12 transition-transform duration-500">
+                  <Leaf className="text-white w-6 h-6" />
+                </div>
+              )}
               <div className="flex flex-col">
-                <span className="font-bold text-xl tracking-tight serif leading-none">OBA ELA</span>
-                <span className="text-[10px] uppercase tracking-[0.2em] text-gold font-bold">Trado Medical</span>
+                <span className="font-bold text-xl tracking-tight serif leading-none">{settings?.siteName || 'OBA ELA'}</span>
+                <span className="text-[10px] uppercase tracking-[0.2em] text-gold font-bold">{settings?.siteTagline || 'Trado Medical'}</span>
               </div>
             </Link>
             
@@ -7598,20 +7877,33 @@ export default function App() {
         <footer className="bg-white border-t border-black/5 py-12">
           <div className="max-w-7xl mx-auto px-4 text-center">
             <div className="flex justify-center gap-6 mb-8">
-              <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-50 rounded-full hover:bg-forest hover:text-white transition-all duration-300 shadow-sm border border-black/5">
-                <Facebook size={20} />
-              </a>
-              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-50 rounded-full hover:bg-forest hover:text-white transition-all duration-300 shadow-sm border border-black/5">
-                <Instagram size={20} />
-              </a>
-              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-50 rounded-full hover:bg-forest hover:text-white transition-all duration-300 shadow-sm border border-black/5">
-                <Twitter size={20} />
-              </a>
-              <a href="https://youtube.com" target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-50 rounded-full hover:bg-forest hover:text-white transition-all duration-300 shadow-sm border border-black/5">
-                <Youtube size={20} />
-              </a>
+              {settings?.socialLinks?.facebook && (
+                <a href={settings.socialLinks.facebook} target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-50 rounded-full hover:bg-forest hover:text-white transition-all duration-300 shadow-sm border border-black/5">
+                  <Facebook size={20} />
+                </a>
+              )}
+              {settings?.socialLinks?.instagram && (
+                <a href={settings.socialLinks.instagram} target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-50 rounded-full hover:bg-forest hover:text-white transition-all duration-300 shadow-sm border border-black/5">
+                  <Instagram size={20} />
+                </a>
+              )}
+              {settings?.socialLinks?.twitter && (
+                <a href={settings.socialLinks.twitter} target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-50 rounded-full hover:bg-forest hover:text-white transition-all duration-300 shadow-sm border border-black/5">
+                  <Twitter size={20} />
+                </a>
+              )}
+              {settings?.socialLinks?.youtube && (
+                <a href={settings.socialLinks.youtube} target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-50 rounded-full hover:bg-forest hover:text-white transition-all duration-300 shadow-sm border border-black/5">
+                  <Youtube size={20} />
+                </a>
+              )}
+              {settings?.socialLinks?.whatsapp && (
+                <a href={settings.socialLinks.whatsapp} target="_blank" rel="noopener noreferrer" className="p-3 bg-gray-50 rounded-full hover:bg-forest hover:text-white transition-all duration-300 shadow-sm border border-black/5">
+                  <MessageCircle size={20} />
+                </a>
+              )}
             </div>
-            <p className="text-sm opacity-50">&copy; 2026 OBA ELA TRADO MEDICAL HEALING LIMITED. All rights reserved.</p>
+            <p className="text-sm opacity-50">{settings?.footerText || `© ${new Date().getFullYear()} OBA ELA TRADO MEDICAL HEALING LIMITED. All rights reserved.`}</p>
             {(userProfile?.role === 'admin' || userProfile?.role === 'super-admin') && (
               <button 
                 onClick={() => { setIsAdminMode(true); navigate('/admin'); }}

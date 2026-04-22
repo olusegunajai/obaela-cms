@@ -170,13 +170,50 @@
     },
     "Setting": {
       "title": "Setting",
-      "description": "Global application settings including theme",
+      "description": "Global application settings including site info, ecommerce and appearance",
       "type": "object",
       "properties": {
-        "key": { "type": "string" },
-        "value": { "type": "object" }
-      },
-      "required": ["key", "value"]
+        "siteName": { "type": "string" },
+        "siteTagline": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "faviconUrl": { "type": "string" },
+        "footerText": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "contactAddress": { "type": "string" },
+        "socialLinks": { "type": "object" },
+        "maintenanceMode": { "type": "boolean" },
+        "ecommerce": { "type": "object" },
+        "appearance": { "type": "object" }
+      }
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "System or user-specific notifications",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "type": { "type": "string", "enum": ["order", "booking", "system", "task"] },
+        "read": { "type": "boolean" },
+        "link": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Internal staff tasks and management",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["pending", "in-progress", "completed"] },
+        "priority": { "type": "string", "enum": ["low", "medium", "high"] },
+        "assignedTo": { "type": "string", "description": "UID of assigned staff" },
+        "dueDate": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      }
     },
     "Review": {
       "title": "Review",

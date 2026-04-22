@@ -9,6 +9,7 @@ import { ToastProvider } from './components/Toast';
 import { ConfirmProvider } from './components/Confirm';
 import { CurrencyProvider } from './contexts/CurrencyContext';
 import { AuthProvider } from './contexts/AuthContext';
+import { SettingsProvider } from './contexts/SettingsContext';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
@@ -16,11 +17,13 @@ createRoot(document.getElementById('root')!).render(
       <ConfirmProvider>
         <ToastProvider>
           <CurrencyProvider>
-            <AuthProvider>
-              <Router>
-                <App />
-              </Router>
-            </AuthProvider>
+            <SettingsProvider>
+              <AuthProvider>
+                <Router>
+                  <App />
+                </Router>
+              </AuthProvider>
+            </SettingsProvider>
           </CurrencyProvider>
         </ToastProvider>
       </ConfirmProvider>

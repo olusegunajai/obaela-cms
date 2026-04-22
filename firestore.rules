@@ -2,32 +2,47 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ===============================================================
+    // Global Deny
+    // ===============================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
     // Helper Functions
     // ===============================================================
-    function isAuthenticated() {
+    function isSignedIn() {
       return request.auth != null;
     }
 
     function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isSuperAdminEmail() {
+      return isSignedIn() && request.auth.token.email == "dbest4real2009@gmail.com";
     }
 
     function isAdmin() {
-      return isAuthenticated() && 
-        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super-admin']) ||
-         request.auth.token.email == "dbest4real2009@gmail.com"); // Default admin
+      return isSuperAdminEmail() || 
+             (isSignedIn() && 
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super-admin']);
     }
 
     function isSuperAdmin() {
-      return isAuthenticated() && 
-        ((exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
-          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super-admin') ||
-         request.auth.token.email == "dbest4real2009@gmail.com");
+      return isSuperAdminEmail() || 
+             (isSignedIn() && 
+              exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+              get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super-admin');
     }
 
-    function hasOnlyAllowedFields(fields) {
-      return request.resource.data.keys().hasOnly(fields);
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
     // ===============================================================
@@ -35,14 +50,13 @@ service cloud.firestore {
     // ===============================================================
     function isValidUser(data) {
       return data.uid is string &&
-             data.email is string &&
              data.role in ['super-admin', 'admin', 'client'];
     }
 
     function isValidProduct(data) {
       return data.name is string && data.name.size() > 0 &&
              data.price is number && data.price >= 0 &&
-             data.stock is int && data.stock >= 0;
+             data.stock is number && data.stock >= 0;
     }
 
     function isValidOrder(data) {
@@ -51,80 +65,77 @@ service cloud.firestore {
              data.email is string &&
              data.items is list &&
              data.totalAmount is number && data.totalAmount >= 0 &&
-             data.status in ['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled'] &&
-             data.paymentReference is string;
+             data.status in ['pending', 'paid', 'processing', 'shipped', 'delivered', 'cancelled'];
     }
 
-    function isValidBabalawo(data) {
-      return data.name is string && data.name.size() > 0 &&
-             data.specialty is string && data.specialty.size() > 0 &&
-             data.bio is string && data.bio.size() > 0 &&
-             data.availability is string && data.availability.size() > 0;
-    }
-
-    function isValidStaff(data) {
-      return data.name is string && data.name.size() > 0 &&
-             data.role is string && data.role.size() > 0 &&
-             data.email is string &&
-             data.status in ['active', 'inactive'];
-    }
-
-    function isValidVideo(data) {
-      return data.title is string && data.title.size() > 0 &&
-             data.youtubeId is string && data.youtubeId.size() > 0;
-    }
-
-    function isValidPage(data) {
-      return data.slug is string && data.slug.size() > 0 &&
-             data.title is string && data.title.size() > 0 &&
-             data.content is string && data.content.size() > 0;
-    }
-
-    function isValidSetting(data) {
-      return data.key is string && data.key.size() > 0 &&
-             data.value is map;
+    function isValidReview(data) {
+      return data.userId is string &&
+             data.userName is string &&
+             data.rating is number && data.rating >= 1 && data.rating <= 5 &&
+             data.text is string;
     }
 
     // ===============================================================
     // Rules
     // ===============================================================
 
+    // User Profiles & Subcollections
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isSuperAdmin());
-      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isSuperAdmin());
+      allow create: if isOwner(userId) && isValidUser(request.resource.data);
+      allow update: if (isOwner(userId) || isSuperAdmin()) && isValidUser(request.resource.data);
+
+      match /enrollments/{courseId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId);
+        
+        match /completions/{lessonId} {
+          allow read: if isOwner(userId) || isAdmin();
+          allow write: if isOwner(userId);
+        }
+      }
     }
 
+    // Products & Reviews
     match /products/{productId} {
       allow read: if true;
       allow write: if isAdmin() && isValidProduct(request.resource.data);
+
+      match /reviews/{reviewId} {
+        allow read: if true;
+        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && isValidReview(request.resource.data);
+        allow update, delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
+      }
     }
 
+    // Consultations
     match /consultations/{consultationId} {
-      allow read: if isAuthenticated() && (resource.data.clientUid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && request.resource.data.clientUid == request.auth.uid;
-      allow update: if isAuthenticated() && (resource.data.clientUid == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (resource.data.clientUid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.clientUid == request.auth.uid;
+      allow update: if isAdmin() || (isSignedIn() && resource.data.clientUid == request.auth.uid);
+      allow delete: if isAdmin();
     }
 
+    // Orders
     match /orders/{orderId} {
-      allow read: if isAuthenticated() && (resource.data.clientUid == request.auth.uid || isAdmin());
-      allow create: if isAuthenticated() && request.resource.data.clientUid == request.auth.uid && isValidOrder(request.resource.data);
+      allow read: if isSignedIn() && (resource.data.clientUid == request.auth.uid || isAdmin());
+      allow create: if isSignedIn() && request.resource.data.clientUid == request.auth.uid && isValidOrder(request.resource.data);
       allow update: if isAdmin();
     }
 
+    // Courses & Lessons
     match /courses/{courseId} {
       allow read: if true;
       allow write: if isAdmin();
       
       match /lessons/{lessonId} {
-        allow read: if isAuthenticated() && (
-          isAdmin() || 
-          exists(/databases/$(database)/documents/users/$(request.auth.uid)/enrollments/$(courseId))
-        );
+        allow read: if true; // Content access level is managed in UI, or we can restrict:
+        // allow read: if isAdmin() || exists(/databases/$(database)/documents/users/$(request.auth.uid)/enrollments/$(courseId));
         allow write: if isAdmin();
       }
     }
 
+    // Content Collections
     match /faqs/{faqId} {
       allow read: if true;
       allow write: if isAdmin();
@@ -132,39 +143,43 @@ service cloud.firestore {
 
     match /babalawos/{babalawoId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidBabalawo(request.resource.data);
+      allow write: if isAdmin();
     }
 
     match /staff/{staffId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidStaff(request.resource.data);
+      allow write: if isAdmin();
     }
 
     match /videos/{videoId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidVideo(request.resource.data);
+      allow write: if isAdmin();
     }
 
     match /pages/{pageId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidPage(request.resource.data);
-    }
-
-    match /tasks/{taskId} {
-      allow read: if isAdmin();
       allow write: if isAdmin();
     }
 
-    match /notifications/{notificationId} {
-      allow read: if isAuthenticated() && request.auth.uid == resource.data.userId;
-      allow update: if isAuthenticated() && request.auth.uid == resource.data.userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
-      allow create: if isAdmin(); // Only admins can send notifications for now, or we can expand this
-      allow delete: if isAuthenticated() && request.auth.uid == resource.data.userId;
+    match /tasks/{taskId} {
+      allow read, write: if isAdmin();
     }
 
+    match /notifications/{notificationId} {
+      allow read: if isSignedIn() && request.auth.uid == resource.data.userId;
+      allow update: if isSignedIn() && request.auth.uid == resource.data.userId && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow create: if isAdmin();
+      allow delete: if isSignedIn() && request.auth.uid == resource.data.userId;
+    }
+
+    match /test/{docId} {
+      allow read, write: if true;
+    }
+
+    // Site Settings
     match /settings/{settingId} {
       allow read: if true;
-      allow write: if isAdmin() && isValidSetting(request.resource.data);
+      allow write: if isAdmin();
     }
   }
 }

@@ -56,7 +56,7 @@ export const productService = {
   },
 
   async getProducts(pageSize: number, lastVisibleDoc?: QueryDocumentSnapshot, category?: string, featuredOnly?: boolean) {
-    const constraints: QueryConstraint[] = [orderBy('createdAt', 'desc')];
+    const constraints: QueryConstraint[] = [];
     
     if (category && category !== 'All') {
       constraints.push(where('category', '==', category));
@@ -64,6 +64,12 @@ export const productService = {
 
     if (featuredOnly) {
       constraints.push(where('featured', '==', true));
+    }
+
+    // Only order by createdAt if no category/featured filter is applied, 
+    // unless we have composite indexes. Without indexes, mixed filters + orderBy fail.
+    if (!category || category === 'All') {
+      constraints.push(orderBy('createdAt', 'desc'));
     }
 
     if (lastVisibleDoc) {
