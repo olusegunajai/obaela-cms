@@ -31,7 +31,9 @@ import {
   Lock,
   Clock,
   Bell,
-  BellRing
+  BellRing,
+  Mail,
+  Phone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -247,6 +249,7 @@ const CustomPage = () => {
 const Home = () => {
   const [user, setUser] = useState(auth.currentUser);
   const [homePage, setHomePage] = useState<Page | null>(null);
+  const [staff, setStaff] = useState<StaffMember[]>([]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => setUser(u));
@@ -259,6 +262,11 @@ const Home = () => {
       setHomePage(page);
     };
     fetchHome();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = staffService.subscribeToStaff(setStaff);
+    return unsubscribe;
   }, []);
 
   return (
@@ -304,11 +312,11 @@ const Home = () => {
               "Connecting you to the ancestral traditions of Ifa and Orisha. Traditional African healing, spiritual guidance, and the path to your true destiny."
             )}
           </div>
-          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center">
-            <Link to="/consultation" className="px-10 py-4 bg-gold text-black font-bold rounded-full hover:bg-white transition-all duration-500 transform hover:scale-105 shadow-xl shadow-gold/20">
+          <div className="flex flex-col sm:flex-row gap-6 justify-center items-center w-full max-w-md mx-auto sm:max-w-none">
+            <Link to="/consultation" className="w-full sm:w-auto px-10 py-4 bg-gold text-black font-bold rounded-full hover:bg-white transition-all duration-500 transform hover:scale-105 shadow-xl shadow-gold/20 text-center">
               Book Consultation
             </Link>
-            <Link to="/store" className="px-10 py-4 border border-white/30 text-white font-bold rounded-full hover:bg-white/10 transition-all duration-500 backdrop-blur-sm">
+            <Link to="/store" className="w-full sm:w-auto px-10 py-4 border border-white/30 text-white font-bold rounded-full hover:bg-white/10 transition-all duration-500 backdrop-blur-sm text-center">
               Explore Store
             </Link>
           </div>
@@ -388,7 +396,7 @@ const Home = () => {
                 <p className="text-earth/70 mb-10 text-lg leading-relaxed font-light">
                   Direct guidance from the Orishas through Ifa divination. Our consultations provide clarity on health, relationships, career, and spiritual growth.
                 </p>
-                <Link to="/consultation" className="inline-flex items-center gap-3 px-8 py-3 bg-forest text-white rounded-full font-bold hover:bg-gold hover:text-black transition-all group">
+                <Link to="/consultation" className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-3 bg-forest text-white rounded-full font-bold hover:bg-gold hover:text-black transition-all group">
                   Book a session <Send size={18} className="group-hover:translate-x-1 transition-transform" />
                 </Link>
               </div>
@@ -514,6 +522,57 @@ const Home = () => {
               <div className="absolute -bottom-10 -right-10 w-64 h-64 bg-gold/20 rounded-full blur-3xl z-0" />
               <div className="absolute -top-10 -left-10 w-64 h-64 bg-forest/20 rounded-full blur-3xl z-0" />
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Our Team Section */}
+      <section className="py-32 bg-white relative overflow-hidden">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-24">
+            <span className="text-forest font-bold tracking-widest uppercase text-[10px] mb-4 block">Meet Our Elders</span>
+            <h2 className="text-4xl md:text-6xl serif mb-6">Our Sacred Team</h2>
+            <p className="text-earth/60 max-w-xl mx-auto text-lg font-light">The dedicated practitioners preserving our ancestral traditions.</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+            {staff.filter(s => s.status === 'active').slice(0, 3).map((member) => (
+              <motion.div 
+                key={member.id}
+                whileHover={{ y: -10 }}
+                className="text-center"
+              >
+                <div className="aspect-[4/5] rounded-[3rem] overflow-hidden mb-8 border border-black/5 shadow-lg">
+                  {member.profileVideoUrl ? (
+                    <div className="w-full h-full">
+                      <ReactPlayer 
+                        url={member.profileVideoUrl}
+                        width="100%"
+                        height="100%"
+                        playing={false}
+                        light={true}
+                        playIcon={<div className="w-16 h-16 bg-white/90 rounded-full flex items-center justify-center shadow-lg"><Play className="text-forest translate-x-0.5" /></div>}
+                      />
+                    </div>
+                  ) : (
+                    <img 
+                      src={`https://picsum.photos/seed/${member.id}/600/800`} 
+                      alt={member.name}
+                      className="w-full h-full object-cover"
+                      referrerPolicy="no-referrer"
+                    />
+                  )}
+                </div>
+                <h3 className="text-2xl font-bold mb-2">{member.name}</h3>
+                <p className="text-forest font-medium">{member.role}</p>
+              </motion.div>
+            ))}
+          </div>
+          
+          <div className="mt-16 text-center">
+            <Link to="/employee-central" className="inline-flex items-center gap-2 text-forest font-bold hover:text-gold transition-colors">
+              View Full Directory <Plus size={16} />
+            </Link>
           </div>
         </div>
       </section>
@@ -812,7 +871,7 @@ const Store = () => {
                 <div className="text-[10px] font-bold text-gold uppercase tracking-[0.3em] mb-4 serif italic">{product.category}</div>
                 <h3 className="text-2xl font-bold mb-4 serif group-hover:text-forest transition-colors leading-tight">{product.name}</h3>
                 <p className="text-sm text-earth/60 line-clamp-2 mb-10 leading-relaxed font-light">{product.description}</p>
-                <div className="flex gap-3">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button 
                     onClick={() => addToCart(product)}
                     disabled={product.stock === 0}
@@ -827,6 +886,7 @@ const Store = () => {
                     title="View Reviews"
                   >
                     <MessageCircle size={20} />
+                    <span className="sm:hidden ml-2">Reviews</span>
                   </button>
                 </div>
               </div>
@@ -1078,18 +1138,18 @@ const Checkout = ({ total, onComplete, onCancel }: { cart: {product: Product, qu
           </div>
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex flex-col sm:flex-row gap-4">
           <button 
             type="button"
             onClick={onCancel}
-            className="flex-1 py-3 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-all"
+            className="flex-1 py-4 border border-gray-200 rounded-xl font-bold hover:bg-gray-50 transition-all text-center"
           >
             Cancel
           </button>
           <button 
             type="submit"
             disabled={isProcessing}
-            className="flex-1 py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all flex items-center justify-center gap-2"
+            className="flex-1 py-4 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-forest/10"
           >
             {isProcessing ? <Loader2 className="animate-spin" /> : 'Pay with Paystack'}
           </button>
@@ -1320,6 +1380,7 @@ const Admin = () => {
   const [videoSearch, setVideoSearch] = useState('');
   const [courseSearch, setCourseSearch] = useState('');
   const [productSearch, setProductSearch] = useState('');
+  const [pageSearch, setPageSearch] = useState('');
 
   const [consultationPage, setConsultationPage] = useState(1);
   const [orderPage, setOrderPage] = useState(1);
@@ -1476,14 +1537,14 @@ const Admin = () => {
   };
 
   const handleBulkDeleteStaff = async () => {
-    showConfirm("Bulk Delete", `Are you sure you want to delete ${selectedStaff.length} staff members?`, async () => {
+    showConfirm("Bulk Delete", `Are you sure you want to delete ${selectedStaff.length} employees?`, async () => {
       try {
         await Promise.all(selectedStaff.map(id => staffService.deleteStaff(id)));
         setSelectedStaff([]);
-        showToast("Staff members deleted successfully", "success");
+        showToast("Employees deleted successfully", "success");
       } catch (error) {
         console.error(error);
-        showToast("Failed to delete staff members", "error");
+        showToast("Failed to delete employees", "error");
       }
     });
   };
@@ -2100,30 +2161,30 @@ const Admin = () => {
     try {
       if (editingStaff?.id) {
         await staffService.updateStaff(editingStaff.id, staffForm);
-        showToast("Staff updated successfully", "success");
+        showToast("Employee updated successfully", "success");
         setEditingStaff(null);
       } else {
         await staffService.addStaff(staffForm);
-        showToast("Staff added successfully", "success");
+        showToast("Employee added successfully", "success");
       }
       setStaffForm({ name: '', role: '', email: '', phone: '', department: '', status: 'active', profileVideoUrl: '' });
     } catch (error) {
       console.error(error);
-      showToast("Failed to save staff", "error");
+      showToast("Failed to save employee", "error");
     }
   };
 
   const handleDeleteStaff = async (id: string) => {
     showConfirm(
-      "Delete Staff",
-      "Are you sure you want to delete this staff member?",
+      "Delete Employee",
+      "Are you sure you want to delete this employee?",
       async () => {
         try {
           await staffService.deleteStaff(id);
-          showToast("Staff deleted successfully", "success");
+          showToast("Employee deleted successfully", "success");
         } catch (error) {
           console.error(error);
-          showToast("Failed to delete staff", "error");
+          showToast("Failed to delete employee", "error");
         }
       }
     );
@@ -2253,7 +2314,7 @@ const Admin = () => {
     { id: 'courses', label: 'Ilé-Àkọ́ni-lọ́gbọ́n', icon: BookOpen, roles: ['admin', 'super-admin'] },
     { id: 'babalawos', label: 'Babaláwos', icon: User, roles: ['admin', 'super-admin'] },
     { id: 'videos', label: 'Videos', icon: Youtube, roles: ['admin', 'super-admin'] },
-    { id: 'staff', label: 'Staff', icon: Users, roles: ['admin', 'super-admin'] },
+    { id: 'staff', label: 'Employee Central', icon: Users, roles: ['admin', 'super-admin'] },
     { id: 'faqs', label: 'FAQs', icon: MessageCircle, roles: ['admin', 'super-admin'] },
     { id: 'media', label: 'Media Manager', icon: Upload, roles: ['admin', 'super-admin'] },
     { id: 'accounting', label: 'Accounting', icon: CreditCard, roles: ['super-admin'] },
@@ -2379,7 +2440,7 @@ const Admin = () => {
           </div>
           <button 
             onClick={() => navigate('/')}
-            className={`w-full flex items-center gap-3 p-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-bold text-sm ${!isSidebarOpen ? 'justify-center' : ''}`}
+            className={`w-full flex items-center gap-3 p-3 rounded-xl text-red-500 hover:bg-red-50 transition-all font-bold text-sm ${!isSidebarOpen ? 'justify-center' : ''} active:scale-95`}
           >
             <LogOut size={20} />
             {isSidebarOpen && <span>Exit Admin</span>}
@@ -2399,7 +2460,7 @@ const Admin = () => {
               >
                 <Menu size={20} />
               </button>
-              <div>
+              <div className="flex-grow">
                 <h2 className="text-xl lg:text-2xl font-bold serif flex items-center gap-2">
                   {menuItems.find(m => m.id === activeTab)?.label}
                   <span className="text-[10px] font-bold bg-forest/10 text-forest px-2 py-0.5 rounded-full uppercase tracking-widest hidden sm:inline-block">Live</span>
@@ -2407,7 +2468,7 @@ const Admin = () => {
                 <p className="text-[10px] lg:text-xs text-gray-500 font-medium">System / {menuItems.find(m => m.id === activeTab)?.label}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
               <div className="hidden sm:flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-black/5 shadow-sm">
                 <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
                 <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">System Online</span>
@@ -2614,18 +2675,18 @@ const Admin = () => {
           ) : activeTab === 'consultations' ? (
         <div className="grid grid-cols-1 gap-8">
           <section>
-            <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-6">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <Calendar className="text-forest" />
                 Recent Consultations
               </h3>
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="relative w-64">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
+                <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                   <input 
                     type="text" 
                     placeholder="Search consultations..." 
-                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-white"
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-white text-sm"
                     value={consultationSearch}
                     onChange={(e) => {
                       setConsultationSearch(e.target.value);
@@ -2634,9 +2695,9 @@ const Admin = () => {
                   />
                 </div>
                 {selectedConsultations.length > 0 && (
-                  <div className="flex items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 animate-in fade-in slide-in-from-top-2">
-                    <span className="text-sm font-bold text-forest">{selectedConsultations.length} Selected</span>
-                    <div className="h-4 w-[1px] bg-forest/20" />
+                  <div className="flex flex-wrap items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 animate-in fade-in slide-in-from-top-2">
+                    <span className="text-sm font-bold text-forest whitespace-nowrap">{selectedConsultations.length} Selected</span>
+                    <div className="hidden sm:block h-4 w-[1px] bg-forest/20" />
                     <select 
                       onChange={(e) => handleBulkUpdateConsultationStatus(e.target.value)}
                       className="bg-transparent text-xs font-bold text-forest outline-none cursor-pointer"
@@ -2980,22 +3041,22 @@ const Admin = () => {
       </div>
       ) : activeTab === 'products' ? (
         <div className="space-y-8">
-          <div className="flex flex-wrap justify-between items-center gap-4">
-            <div className="flex flex-wrap items-center gap-4">
-              <h3 className="text-2xl font-bold serif">Product Management</h3>
-              <div className="relative w-64">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
+              <h3 className="text-2xl font-bold serif whitespace-nowrap">Product Management</h3>
+              <div className="relative w-full sm:w-64">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
                   type="text" 
                   placeholder="Search products..." 
-                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-white"
+                  className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-white text-sm"
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
                 />
               </div>
               {selectedProducts.length > 0 && (
-                <div className="flex items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10">
-                  <span className="text-sm font-bold text-forest">{selectedProducts.length} Selected</span>
+                <div className="flex flex-wrap items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 w-full sm:w-auto">
+                  <span className="text-sm font-bold text-forest whitespace-nowrap">{selectedProducts.length} Selected</span>
                   <button 
                     onClick={handleBulkDeleteProducts}
                     className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
@@ -3157,18 +3218,18 @@ const Admin = () => {
       ) : activeTab === 'orders' ? (
         <div className="grid grid-cols-1 gap-8">
           <section>
-            <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-6">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <Truck className="text-forest" />
                 Manage Orders
               </h3>
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="relative w-64">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
+                <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                   <input 
                     type="text" 
                     placeholder="Search orders..." 
-                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-white"
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-white text-sm"
                     value={orderSearch}
                     onChange={(e) => {
                       setOrderSearch(e.target.value);
@@ -3177,9 +3238,9 @@ const Admin = () => {
                   />
                 </div>
                 {selectedOrders.length > 0 && (
-                  <div className="flex items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 animate-in fade-in slide-in-from-top-2">
-                    <span className="text-sm font-bold text-forest">{selectedOrders.length} Selected</span>
-                    <div className="h-4 w-[1px] bg-forest/20" />
+                  <div className="flex flex-wrap items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 animate-in fade-in slide-in-from-top-2">
+                    <span className="text-sm font-bold text-forest whitespace-nowrap">{selectedOrders.length} Selected</span>
+                    <div className="hidden sm:block h-4 w-[1px] bg-forest/20" />
                     <select 
                       onChange={(e) => handleBulkUpdateOrderStatus(e.target.value)}
                       className="bg-transparent text-xs font-bold text-forest outline-none cursor-pointer"
@@ -3766,7 +3827,7 @@ const Admin = () => {
             <div className="bg-white p-6 rounded-3xl border border-black/5 shadow-sm sticky top-24">
               <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                 {editingStaff ? <Edit2 className="text-forest" /> : <Plus className="text-forest" />}
-                {editingStaff ? 'Edit Staff' : 'Add New Staff'}
+                {editingStaff ? 'Edit Employee' : 'Add New Employee'}
               </h3>
               <form onSubmit={handleSubmitStaff} className="space-y-4">
                 <input 
@@ -3851,7 +3912,7 @@ const Admin = () => {
                   type="submit" 
                   className="w-full py-3 bg-forest text-white rounded-xl font-bold hover:bg-opacity-90 transition-all"
                 >
-                  {editingStaff ? 'Update Staff' : 'Save Staff'}
+                  {editingStaff ? 'Update Employee' : 'Save Employee'}
                 </button>
                 {editingStaff && (
                   <button 
@@ -3871,7 +3932,7 @@ const Admin = () => {
             <div className="bg-white rounded-3xl border border-black/5 overflow-hidden shadow-sm">
               <div className="p-4 border-b border-black/5 flex flex-wrap justify-between items-center gap-4">
                 <div className="flex items-center gap-4">
-                  <h4 className="font-bold">Staff Directory</h4>
+                  <h4 className="font-bold">Employee Central</h4>
                   {selectedStaff.length > 0 && (
                     <div className="flex items-center gap-2 bg-forest/10 px-3 py-1 rounded-full">
                       <span className="text-xs font-bold text-forest">{selectedStaff.length} Selected</span>
@@ -3935,7 +3996,7 @@ const Admin = () => {
                           }}
                         />
                       </th>
-                      <th className="p-4 text-sm font-bold">Staff</th>
+                      <th className="p-4 text-sm font-bold">Employee</th>
                       <th className="p-4 text-sm font-bold">Role/Dept</th>
                       <th className="p-4 text-sm font-bold">Status</th>
                       <th className="p-4 text-sm font-bold">Actions</th>
@@ -4453,12 +4514,12 @@ const Admin = () => {
         </div>
       ) : activeTab === 'pages' ? (
         <div className="space-y-8">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-4">
-              <h3 className="text-2xl font-bold serif">Page Management</h3>
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6 mb-8">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full lg:w-auto">
+              <h3 className="text-2xl font-bold serif whitespace-nowrap">Page Management</h3>
               {selectedPages.length > 0 && (
-                <div className="flex items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10">
-                  <span className="text-sm font-bold text-forest">{selectedPages.length} Selected</span>
+                <div className="flex flex-wrap items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 w-full sm:w-auto">
+                  <span className="text-sm font-bold text-forest whitespace-nowrap">{selectedPages.length} Selected</span>
                   <button 
                     onClick={handleBulkDeletePages}
                     className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-all"
@@ -4475,10 +4536,10 @@ const Admin = () => {
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
               <button 
                 onClick={() => setIsVisualEditor(!isVisualEditor)}
-                className={`px-4 py-2 rounded-xl font-bold transition-all flex items-center gap-2 ${
+                className={`px-4 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 ${
                   isVisualEditor ? 'bg-forest text-white' : 'bg-gray-100 text-gray-600'
                 }`}
               >
@@ -4491,7 +4552,7 @@ const Admin = () => {
                   setEditingPage(null);
                   setIsPageModalOpen(true);
                 }}
-                className="bg-forest text-white px-6 py-3 rounded-xl font-bold hover:bg-opacity-90 transition-all flex items-center gap-2"
+                className="bg-forest text-white px-6 py-3 rounded-xl font-bold hover:bg-opacity-90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-forest/10"
               >
                 <Plus size={20} />
                 New Page
@@ -4951,18 +5012,18 @@ const Admin = () => {
               </form>
             </section>
 
-            <div className="flex flex-wrap justify-between items-center gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-6">
               <h3 className="text-xl font-bold flex items-center gap-2">
                 <User className="text-forest" />
                 Manage Users & Access
               </h3>
-              <div className="flex flex-wrap items-center gap-4">
-                <div className="relative w-64">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full sm:w-auto">
+                <div className="relative w-full sm:w-64">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                   <input 
                     type="text" 
                     placeholder="Search users..." 
-                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-white"
+                    className="w-full pl-10 pr-4 py-2 rounded-xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-white text-sm"
                     value={userSearch}
                     onChange={(e) => {
                       setUserSearch(e.target.value);
@@ -4971,9 +5032,9 @@ const Admin = () => {
                   />
                 </div>
                 {selectedUsers.length > 0 && (
-                  <div className="flex items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 animate-in fade-in slide-in-from-top-2">
-                    <span className="text-sm font-bold text-forest">{selectedUsers.length} Selected</span>
-                    <div className="h-4 w-[1px] bg-forest/20" />
+                  <div className="flex flex-wrap items-center gap-4 bg-forest/5 px-4 py-2 rounded-2xl border border-forest/10 animate-in fade-in slide-in-from-top-2">
+                    <span className="text-sm font-bold text-forest whitespace-nowrap">{selectedUsers.length} Selected</span>
+                    <div className="hidden sm:block h-4 w-[1px] bg-forest/20" />
                     <select 
                       onChange={(e) => handleBulkUpdateUserRole(e.target.value as UserRole)}
                       className="bg-transparent text-xs font-bold text-forest outline-none cursor-pointer"
@@ -6261,10 +6322,10 @@ const Training = () => {
               <button 
                 onClick={() => handleCompleteLesson(activeLesson.id!)}
                 disabled={completed}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${
+                className={`w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all ${
                   completed 
                     ? 'bg-green-100 text-green-700 cursor-default' 
-                    : 'bg-forest text-white hover:bg-opacity-90'
+                    : 'bg-forest text-white hover:bg-opacity-90 active:scale-95'
                 }`}
               >
                 {completed ? (
@@ -7083,16 +7144,26 @@ const ChatBot = () => {
   );
 };
 
-const StaffDirectory = () => {
+const EmployeeCentral = () => {
+  const { userProfile } = useAuth();
+  const navigate = useNavigate();
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
 
   useEffect(() => {
+    if (!userProfile || (userProfile.role !== 'admin' && userProfile.role !== 'super-admin')) {
+      navigate('/');
+      return;
+    }
     const unsubscribe = staffService.subscribeToStaff(setStaff);
     return unsubscribe;
-  }, []);
+  }, [userProfile, navigate]);
+
+  if (!userProfile || (userProfile.role !== 'admin' && userProfile.role !== 'super-admin')) {
+    return null;
+  }
 
   const departments = ['All', ...new Set(staff.map(s => s.department).filter(Boolean))];
   
@@ -7108,15 +7179,15 @@ const StaffDirectory = () => {
     <div className="min-h-screen bg-paper pt-32 pb-24">
       <div className="max-w-7xl mx-auto px-6">
         <div className="mb-16 text-center">
-          <h2 className="text-5xl serif mb-6 text-forest">Our Sacred Team</h2>
+          <h2 className="text-5xl serif mb-6 text-forest">Employee Central</h2>
           <p className="text-earth/60 max-w-2xl mx-auto text-lg">
-            Meet the dedicated individuals who serve the OBA ELA community with wisdom, compassion, and tradition.
+            Internal portal for the dedicated individuals who serve the OBA ELA community.
           </p>
         </div>
 
         {/* Filters */}
-        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-black/5 mb-12 flex flex-wrap gap-6 items-center justify-between">
-          <div className="relative flex-grow max-w-md">
+        <div className="bg-white p-6 rounded-[2rem] shadow-sm border border-black/5 mb-12 flex flex-col lg:flex-row gap-6 items-stretch lg:items-center justify-between">
+          <div className="relative flex-grow lg:max-w-md">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
             <input 
               type="text" 
@@ -7126,9 +7197,9 @@ const StaffDirectory = () => {
               onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-4">
             <select 
-              className="px-6 py-4 rounded-2xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-gray-50 text-sm font-bold"
+              className="w-full sm:w-auto px-6 py-4 rounded-2xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-gray-50 text-sm font-bold"
               value={selectedDepartment}
               onChange={(e) => setSelectedDepartment(e.target.value)}
             >
@@ -7137,7 +7208,7 @@ const StaffDirectory = () => {
               ))}
             </select>
             <select 
-              className="px-6 py-4 rounded-2xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-gray-50 text-sm font-bold"
+              className="w-full sm:w-auto px-6 py-4 rounded-2xl border border-black/5 outline-none focus:ring-2 focus:ring-forest bg-gray-50 text-sm font-bold"
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
             >
@@ -7346,9 +7417,11 @@ export default function App() {
             
             {/* Desktop Menu */}
             <div className="hidden md:flex items-center gap-10">
-              <Link to="/staff" className="text-sm font-semibold hover:text-gold transition-colors tracking-wide">
-                Staff Directory
-              </Link>
+              {(userProfile?.role === 'admin' || userProfile?.role === 'super-admin') && (
+                <Link to="/employee-central" className="text-sm font-semibold hover:text-gold transition-colors tracking-wide">
+                  Employee Central
+                </Link>
+              )}
               {pages.filter(p => p.isPublished && p.slug !== 'home').map(p => (
                 <Link 
                   key={p.id} 
@@ -7477,7 +7550,9 @@ export default function App() {
               className="fixed inset-0 bg-white z-40 md:hidden pt-20 px-6"
             >
               <div className="flex flex-col gap-6 text-2xl font-semibold">
-                <Link to="/staff" onClick={() => setIsMenuOpen(false)}>Staff Directory</Link>
+                {(userProfile?.role === 'admin' || userProfile?.role === 'super-admin') && (
+                  <Link to="/employee-central" onClick={() => setIsMenuOpen(false)}>Employee Central</Link>
+                )}
                 {pages.filter(p => p.isPublished && p.slug !== 'home').map(p => (
                   <Link 
                     key={p.id} 
@@ -7503,7 +7578,7 @@ export default function App() {
             <Route path="/orders" element={<Orders />} />
             <Route path="/consultation" element={<Consultation />} />
             <Route path="/training" element={<Training />} />
-            <Route path="/staff" element={<StaffDirectory />} />
+            <Route path="/employee-central" element={<EmployeeCentral />} />
             <Route path="/gallery" element={<Gallery userProfile={userProfile} />} />
             <Route path="/p/:slug" element={<CustomPage />} />
             <Route 

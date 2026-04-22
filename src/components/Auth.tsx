@@ -116,10 +116,11 @@ export const Auth = () => {
     <>
       <button 
         onClick={() => setIsModalOpen(true)}
-        className="flex items-center gap-2 px-6 py-2.5 bg-forest text-white rounded-xl text-sm font-bold hover:bg-opacity-90 transition-all shadow-lg shadow-forest/20"
+        className="flex items-center gap-2 px-6 py-2.5 bg-forest text-white rounded-xl text-sm font-bold hover:bg-opacity-90 transition-all shadow-lg shadow-forest/20 whitespace-nowrap"
       >
         <LogIn size={18} />
-        <span>Sign In</span>
+        <span className="hidden sm:inline">Sign In</span>
+        <span className="sm:hidden">Login</span>
       </button>
 
       <AnimatePresence>
