@@ -256,6 +256,8 @@
     "videos": { "schema": "YouTubeVideo", "description": "Collection of YouTube videos" },
     "pages": { "schema": "Page", "description": "Collection of custom content pages" },
     "settings": { "schema": "Setting", "description": "Collection of global application settings" },
-    "faqs": { "schema": "FAQ", "description": "Collection of frequently asked questions" }
+    "faqs": { "schema": "FAQ", "description": "Collection of frequently asked questions" },
+    "tasks": { "schema": "Task", "description": "Collection of internal staff tasks" },
+    "notifications": { "schema": "Notification", "description": "Collection of system and user notifications" }
   }
 }

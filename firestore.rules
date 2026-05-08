@@ -75,6 +75,12 @@ service cloud.firestore {
              data.text is string;
     }
 
+    function isValidConsultation(data) {
+      return data.clientUid is string &&
+             data.type in ["Ifa Divination", "Spiritual Guidance", "Destiny Reading", "Spiritual Cleansing", "Traditional Healing"] &&
+             data.status in ["pending", "confirmed", "completed", "cancelled"];
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -111,8 +117,8 @@ service cloud.firestore {
     // Consultations
     match /consultations/{consultationId} {
       allow read: if isSignedIn() && (resource.data.clientUid == request.auth.uid || isAdmin());
-      allow create: if isSignedIn() && request.resource.data.clientUid == request.auth.uid;
-      allow update: if isAdmin() || (isSignedIn() && resource.data.clientUid == request.auth.uid);
+      allow create: if isSignedIn() && request.resource.data.clientUid == request.auth.uid && isValidConsultation(request.resource.data);
+      allow update: if (isAdmin() || (isSignedIn() && resource.data.clientUid == request.auth.uid)) && isValidConsultation(request.resource.data);
       allow delete: if isAdmin();
     }
 
