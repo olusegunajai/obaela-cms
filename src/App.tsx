@@ -41,10 +41,9 @@ import { Auth } from './components/Auth';
 import { consultationService, ConsultationType, Consultation as ConsultationData, ConsultationStatus } from './services/consultationService';
 import { auth, db } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, query, orderBy, onSnapshot, doc, setDoc, serverTimestamp, QueryDocumentSnapshot } from 'firebase/firestore';
 import { productService, Product } from './services/productService';
 import { uploadImage, uploadVideo } from './services/cloudinaryService';
-import { ShoppingCart, Plus, Trash2, Edit2, Upload, Loader2, Printer, MessageCircle, Send, X as CloseIcon, Play, Facebook, Instagram, Twitter, Star, Eye, History } from 'lucide-react';
+import { ShoppingCart, Plus, Trash2, Edit2, Upload, Loader2, Printer, MessageCircle, Send, X as CloseIcon, Play, Facebook, Instagram, Twitter, Star, Eye, History as HistoryIcon, Search, LayoutDashboard, Leaf, Sparkles, BookOpen, Check, X } from 'lucide-react';
 import { usePaystackPayment } from 'react-paystack';
 import { orderService, OrderStatus, Order } from './services/orderService';
 import { courseService, Course, Lesson, Enrollment } from './services/courseService';
@@ -491,9 +490,12 @@ const Store = () => {
   const { currency } = useCurrency();
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<string[]>(['All']);
-  const [lastVisible, setLastVisible] = useState<QueryDocumentSnapshot | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const loadingRef = useRef(false);
+  const hasMoreRef = useRef(true);
+  const lastVisibleRef = useRef<QueryDocumentSnapshot | null>(null);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [showFeaturedOnly, setShowFeaturedOnly] = useState(false);
@@ -505,13 +507,14 @@ const Store = () => {
   const PAGE_SIZE = 8;
 
   const fetchProducts = useCallback(async (isFirstLoad = false, category = selectedCategory, featured = showFeaturedOnly) => {
-    if (isLoading || (!isFirstLoad && !hasMore)) return;
+    if (loadingRef.current || (!isFirstLoad && !hasMoreRef.current)) return;
     
     setIsLoading(true);
+    loadingRef.current = true;
     try {
       const result = await productService.getProducts(
         PAGE_SIZE, 
-        isFirstLoad ? undefined : (lastVisible || undefined), 
+        isFirstLoad ? undefined : (lastVisibleRef.current || undefined), 
         category, 
         featured
       );
@@ -523,25 +526,28 @@ const Store = () => {
       }
       
       setLastVisible(result.lastVisible || null);
+      lastVisibleRef.current = result.lastVisible || null;
       setHasMore(result.products.length === PAGE_SIZE);
+      hasMoreRef.current = result.products.length === PAGE_SIZE;
     } catch (error) {
       console.error("Error fetching products:", error);
       showToast("Failed to load products.", "error");
     } finally {
       setIsLoading(false);
+      loadingRef.current = false;
     }
-  }, [isLoading, hasMore, lastVisible, selectedCategory, showFeaturedOnly, showToast]);
+  }, [selectedCategory, showFeaturedOnly, showToast]);
 
   const lastProductElementRef = useCallback((node: HTMLDivElement | null) => {
-    if (isLoading) return;
+    if (loadingRef.current) return;
     if (observer.current) observer.current.disconnect();
     observer.current = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting && hasMore) {
+      if (entries[0].isIntersecting && hasMoreRef.current) {
         fetchProducts();
       }
     });
     if (node) observer.current.observe(node);
-  }, [isLoading, hasMore, fetchProducts]);
+  }, [fetchProducts]);
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -1959,10 +1965,7 @@ const Admin = () => {
     let unsubscribeUsers = () => {};
 
     if (userProfile?.role === 'admin' || userProfile?.role === 'super-admin') {
-      const q = query(collection(db, 'consultations'), orderBy('createdAt', 'desc'));
-      unsubscribeConsultations = onSnapshot(q, (snapshot) => {
-        setAllConsultations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ConsultationData[]);
-      });
+      unsubscribeConsultations = consultationService.subscribeToAllConsultations(setAllConsultations);
       unsubscribeOrders = orderService.subscribeToAllOrders(setAllOrders);
       const unsubscribeCourses = courseService.subscribeToCourses(setCourses);
       const unsubscribeBabalawos = babalawoService.subscribeToBabalawos(setBabalawos);
@@ -2064,12 +2067,17 @@ const Admin = () => {
   const handleSubmitVideo = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const youtubeId = videoService.getYouTubeId(videoForm.youtubeId);
+      const thumbnailUrl = videoForm.thumbnailUrl || videoService.getThumbnailUrl(youtubeId);
+      
+      const finalVideoForm = { ...videoForm, youtubeId, thumbnailUrl };
+
       if (editingVideo?.id) {
-        await videoService.updateVideo(editingVideo.id, videoForm);
+        await videoService.updateVideo(editingVideo.id, finalVideoForm);
         showToast("Video updated successfully", "success");
         setEditingVideo(null);
       } else {
-        await videoService.addVideo(videoForm);
+        await videoService.addVideo(finalVideoForm);
         showToast("Video added successfully", "success");
       }
       setVideoForm({ title: '', description: '', youtubeId: '', thumbnailUrl: '', requiredLevel: 0 });
@@ -6338,13 +6346,21 @@ const Admin = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">YouTube Video ID</label>
+                    <label className="block text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">YouTube Video URL or ID</label>
                     <input 
                       type="text" 
                       value={videoForm.youtubeId}
-                      onChange={e => setVideoForm({...videoForm, youtubeId: e.target.value})}
+                      onChange={e => {
+                        const val = e.target.value;
+                        const id = videoService.getYouTubeId(val);
+                        setVideoForm({
+                          ...videoForm, 
+                          youtubeId: val,
+                          thumbnailUrl: videoForm.thumbnailUrl || videoService.getThumbnailUrl(id)
+                        });
+                      }}
                       className="w-full p-4 rounded-2xl border border-black/5 bg-gray-50 outline-none focus:ring-2 focus:ring-forest"
-                      placeholder="e.g. dQw4w9WgXcQ"
+                      placeholder="e.g. https://www.youtube.com/watch?v=dQw4w9WgXcQ"
                       required
                     />
                   </div>
@@ -7071,7 +7087,7 @@ const Consultation = () => {
           className="bg-white p-12 rounded-[3rem] shadow-sm border border-black/5 spiritual-glow h-fit"
         >
           <h2 className="text-3xl font-bold mb-8 serif flex items-center gap-3">
-            <History className="text-forest" />
+            <HistoryIcon className="text-forest" />
             Your Sacred Records
           </h2>
           <div className="space-y-6">

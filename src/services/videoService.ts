@@ -22,18 +22,42 @@ export interface YouTubeVideo {
 }
 
 export const videoService = {
+  getYouTubeId(url: string) {
+    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|&v=)([^#&?]*).*/;
+    const match = url.match(regExp);
+    return (match && match[2].length === 11) ? match[2] : url;
+  },
+
+  getThumbnailUrl(videoId: string) {
+    return `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+  },
+
   async addVideo(videoData: Omit<YouTubeVideo, 'id' | 'createdAt'>) {
+    const youtubeId = this.getYouTubeId(videoData.youtubeId);
+    const thumbnailUrl = videoData.thumbnailUrl || this.getThumbnailUrl(youtubeId);
+    
     const videosRef = collection(db, 'videos');
     return addDoc(videosRef, {
       ...videoData,
+      youtubeId,
+      thumbnailUrl,
       createdAt: serverTimestamp()
     });
   },
 
   async updateVideo(videoId: string, videoData: Partial<YouTubeVideo>) {
+    const updateData = { ...videoData };
+    if (videoData.youtubeId) {
+      const youtubeId = this.getYouTubeId(videoData.youtubeId);
+      updateData.youtubeId = youtubeId;
+      if (!videoData.thumbnailUrl) {
+        updateData.thumbnailUrl = this.getThumbnailUrl(youtubeId);
+      }
+    }
+
     const videoRef = doc(db, 'videos', videoId);
     return updateDoc(videoRef, {
-      ...videoData,
+      ...updateData,
       updatedAt: serverTimestamp()
     });
   },

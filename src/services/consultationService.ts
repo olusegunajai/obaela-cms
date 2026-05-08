@@ -10,6 +10,43 @@ import {
 } from 'firebase/firestore';
 import { db, auth } from '../firebase';
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 export enum ConsultationType {
   IFA_DIVINATION = "Ifa Divination",
   SPIRITUAL_GUIDANCE = "Spiritual Guidance",
@@ -53,7 +90,11 @@ export const consultationService = {
       createdAt: new Date().toISOString()
     };
 
-    return await addDoc(collection(db, COLLECTION_NAME), newConsultation);
+    try {
+      return await addDoc(collection(db, COLLECTION_NAME), newConsultation);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, COLLECTION_NAME);
+    }
   },
 
   subscribeToUserConsultations(callback: (consultations: Consultation[]) => void) {
@@ -72,12 +113,29 @@ export const consultationService = {
       })) as Consultation[];
       callback(consultations);
     }, (error) => {
-      console.error("Error fetching consultations:", error);
+      handleFirestoreError(error, OperationType.LIST, COLLECTION_NAME);
+    });
+  },
+
+  subscribeToAllConsultations(callback: (consultations: Consultation[]) => void) {
+    const q = query(collection(db, COLLECTION_NAME), orderBy('createdAt', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      const consultations = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Consultation[];
+      callback(consultations);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, COLLECTION_NAME);
     });
   },
 
   async updateStatus(id: string, status: ConsultationStatus) {
     const docRef = doc(db, COLLECTION_NAME, id);
-    return await updateDoc(docRef, { status });
+    try {
+      return await updateDoc(docRef, { status });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `${COLLECTION_NAME}/${id}`);
+    }
   }
 };
